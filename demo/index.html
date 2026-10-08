@@ -1,0 +1,903 @@
+<!doctype html>
+<html lang="zh-Hant" data-backdrop="aurora">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>glass-toast · 毛玻璃 toast 通知</title>
+  <meta name="description" content="@dennykuo/glass-toast 互動 demo：四種變體、三個位置、可切換的背景與深淺色毛玻璃，全部現場可試。">
+  <link rel="preconnect" href="https://picsum.photos">
+  <style>
+    /* ======================================================================
+       demo 頁樣式 — 與套件同調：零相依、純 CSS、無 webfont（不拖慢 LCP，
+       也不讓「零相依元件」的櫥窗自己去載三支字型）。
+
+       深淺色只維護一組 token：light-dark() 依 :root 的 color-scheme 解析，
+       [data-theme] 只需切 color-scheme，就與套件的
+       prefers-color-scheme / [data-theme="dark"] 兩種慣例同步。
+       ====================================================================== */
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root {
+      color-scheme: light dark;
+
+      --mono: ui-monospace, SFMono-Regular, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+      /* --- 顏色：單一 accent（取自套件 info 變體的品牌藍），全頁不換色 --- */
+      --page-bg:      light-dark(#e8edf4, #070a11);
+      --ink:          light-dark(#152233, #e7eef6);
+      --ink-soft:     light-dark(#42566e, #a9bacd);
+      --ink-faint:    light-dark(#5d6f85, #8b9cae);
+      --accent:       light-dark(#2f5875, #a8c9e4);
+      --accent-hover: light-dark(#24455c, #c4dcf0);
+      --accent-ink:   light-dark(#ffffff, #0b1522);
+      --hairline:        light-dark(rgba(21, 34, 51, 0.12), rgba(231, 238, 246, 0.12));
+      --hairline-strong: light-dark(rgba(21, 34, 51, 0.20), rgba(231, 238, 246, 0.22));
+
+      /* --- 玻璃面板：與套件同語彙，但更低對比，不跟主角搶戲 --- */
+      --panel-bg:      light-dark(rgba(255, 255, 255, 0.55), rgba(20, 27, 38, 0.55));
+      --panel-opaque:  light-dark(rgba(255, 255, 255, 0.93), rgba(20, 27, 38, 0.94));
+      --panel-border:  light-dark(rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.08));
+      --panel-shadow:  light-dark(0 24px 60px -34px rgba(15, 35, 60, 0.5), 0 24px 60px -34px rgba(0, 0, 0, 0.75));
+      --field-bg:      light-dark(rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.05));
+      --field-on:      light-dark(#ffffff, rgba(255, 255, 255, 0.11));
+      --code-bg:       light-dark(rgba(255, 255, 255, 0.5), rgba(8, 12, 19, 0.5));
+
+      /* --- 背景場景 --- */
+      --aurora-1: light-dark(rgba(56, 189, 248, 0.34), rgba(56, 189, 248, 0.20));
+      --aurora-2: light-dark(rgba(45, 212, 191, 0.26), rgba(45, 212, 191, 0.16));
+      --aurora-3: light-dark(rgba(251, 191, 36, 0.22), rgba(251, 146, 60, 0.14));
+      --aurora-4: light-dark(rgba(251, 113, 133, 0.20), rgba(251, 113, 133, 0.14));
+      --scrim:    light-dark(rgba(232, 237, 244, 0.76), rgba(7, 10, 17, 0.80));
+
+      /* --- 圓角尺標（只有兩級 + 圓鈕）：面板 20 / 控制項 10 / 全圓 --- */
+      --r-panel: 20px;
+      --r-control: 10px;
+      --r-inner: 7px;   /* 巢狀於 3px padding 的控制項內層 */
+      --r-pill: 999px;
+
+      /* --- 語法高亮 --- */
+      --tok-kw:  light-dark(#8a3ea8, #d9b4ef);
+      --tok-str: light-dark(#0a6b4a, #86dcb4);
+      --tok-fn:  light-dark(#1d5f8a, #8ec8ef);
+      --tok-num: light-dark(#96470f, #f2b57f);
+    }
+
+    /* 手動指定時鎖住 color-scheme，light-dark() 與套件的 dark 規則一起翻面 */
+    :root[data-theme="light"] { color-scheme: light; }
+    :root[data-theme="dark"]  { color-scheme: dark; }
+
+    /* 照片底圖明暗跨度大（雪地到夜空），次要文字若沿用漸層模式的色階，
+       壓在最暗岩壁或最亮雪地上會掉到 3:1 上下。此模式把次要色階往主色靠，
+       量測後最壞情況仍有 4.5:1 */
+    :root[data-backdrop="photo"] {
+      --ink-soft:  light-dark(#2f4055, #a9bacd);
+      --ink-faint: light-dark(#35475d, #9dadbe);
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background-color: var(--page-bg);
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+                   "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      transition: background-color 300ms ease, color 300ms ease;
+    }
+
+    a { color: var(--accent); text-underline-offset: 3px; }
+
+    /* --- 背景場景：三種底圖讓開發者實地驗證 backdrop-filter --- */
+
+    .scene { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+    .scene > * { position: absolute; inset: 0; transition: opacity 450ms ease; }
+
+    .scene__aurora {
+      background-image:
+        radial-gradient(40rem 40rem at 12% 18%, var(--aurora-1), transparent 62%),
+        radial-gradient(34rem 34rem at 88% 12%, var(--aurora-2), transparent 62%),
+        radial-gradient(46rem 46rem at 78% 84%, var(--aurora-3), transparent 62%),
+        radial-gradient(30rem 30rem at 22% 92%, var(--aurora-4), transparent 62%);
+    }
+
+    .scene__photo, .scene__scrim { opacity: 0; }
+    .scene__photo { background-position: center; background-size: cover; }
+    .scene__scrim { background-color: var(--scrim); }
+
+    /* 照片只在選到時才給 url，預設不發這支請求 */
+    :root[data-backdrop="photo"] .scene__photo {
+      opacity: 1;
+      background-image: url("https://picsum.photos/seed/glass-toast-backdrop/1800/1200");
+    }
+    :root[data-backdrop="photo"] .scene__scrim { opacity: 1; }
+    :root[data-backdrop="photo"] .scene__aurora,
+    :root[data-backdrop="flat"] .scene__aurora { opacity: 0; }
+
+    /* --- 版面骨架 --- */
+
+    .page { position: relative; z-index: 1; }
+    .wrap {
+      width: 100%;
+      max-width: 1160px;
+      margin-inline: auto;
+      padding-inline: clamp(1.25rem, 4vw, 2.5rem);
+    }
+
+    /* --- 頂列：控制項一律靠左，把畫面右上角讓給 top-right 容器裡的真通知 --- */
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.5rem;
+      min-height: 64px;
+      padding-block: 1rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      margin-right: 0.25rem;
+      font-family: var(--mono);
+      font-size: 0.9375rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .brand__version {
+      padding: 0.05rem 0.5rem;
+      border: 1px solid var(--hairline);
+      border-radius: var(--r-pill);
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--ink-faint);
+    }
+
+    /* --- 分段控制項（真 radio，方向鍵可切換） --- */
+
+    .seg { display: inline-flex; align-items: center; gap: 0.6rem; }
+    .seg__label { font-size: 0.8125rem; color: var(--ink-faint); white-space: nowrap; }
+
+    .seg__track {
+      display: flex;
+      /* 位置那組的選項字很長，窄視窗要能換行，否則會把整個面板撐破版 */
+      flex-wrap: wrap;
+      gap: 2px;
+      padding: 3px;
+      background: var(--field-bg);
+      border: 1px solid var(--hairline);
+      border-radius: var(--r-control);
+    }
+
+    .seg__opt { position: relative; display: flex; }
+    .seg__opt input {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      margin: 0; opacity: 0; cursor: pointer;
+    }
+
+    .seg__opt span {
+      padding: 0.3rem 0.65rem;
+      border-radius: var(--r-inner);
+      font-size: 0.8125rem;
+      color: var(--ink-soft);
+      white-space: nowrap;
+      transition: background-color 160ms ease, color 160ms ease;
+    }
+
+    .seg__opt input:checked + span {
+      background: var(--field-on);
+      color: var(--ink);
+      font-weight: 600;
+    }
+    .seg__opt input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* --- 按鈕 --- */
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.7rem 1.15rem;
+      border: 1px solid transparent;
+      border-radius: var(--r-control);
+      font: inherit;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: background-color 160ms ease, border-color 160ms ease, transform 120ms ease;
+    }
+
+    .btn--primary { background: var(--accent); color: var(--accent-ink); }
+    .btn--primary:hover { background: var(--accent-hover); }
+
+    .btn--ghost {
+      background: var(--field-bg);
+      border-color: var(--hairline-strong);
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      padding: 0.55rem 0.85rem;
+    }
+    .btn--ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+    .btn--mini {
+      padding: 0.35rem 0.7rem;
+      border-radius: var(--r-inner);
+      background: transparent;
+      border-color: var(--hairline-strong);
+      color: var(--ink-soft);
+      font-size: 0.8125rem;
+      font-weight: 500;
+    }
+    .btn--mini:hover { border-color: var(--accent); color: var(--accent); }
+
+    .btn:active { transform: translateY(1px); }
+    .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* --- Hero --- */
+
+    .hero {
+      display: grid;
+      gap: clamp(2.25rem, 5vw, 3.5rem);
+      align-items: center;
+      padding-block: clamp(2rem, 5vw, 3.5rem) clamp(3rem, 8vw, 5.5rem);
+    }
+
+    @media (min-width: 900px) {
+      .hero { grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr); }
+    }
+
+    .hero h1 {
+      margin: 0 0 1rem;
+      font-size: clamp(2.05rem, 4.6vw, 3.05rem);
+      line-height: 1.2;
+      letter-spacing: -0.035em;
+      font-weight: 700;
+      text-wrap: balance;
+    }
+    .hero h1 b { color: var(--accent); font-weight: 800; }
+    /* 中文沒有詞間空白，交給瀏覽器斷行會把「零相依開箱即用」拆得莫名其妙；
+       整句包成不可斷行單位，換行只發生在逗號後 */
+    .nowrap { white-space: nowrap; }
+
+    .hero__sub {
+      margin: 0 0 2rem;
+      max-width: 30ch;
+      font-size: clamp(1rem, 1.5vw, 1.125rem);
+      color: var(--ink-soft);
+    }
+
+    .hero__cta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+
+    .cmd {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.4rem 0.4rem 0.4rem 0.9rem;
+      background: var(--field-bg);
+      border: 1px solid var(--hairline-strong);
+      border-radius: var(--r-control);
+      font-family: var(--mono);
+      font-size: 0.8125rem;
+      color: var(--ink);
+    }
+
+    /* 展示用的真元件切片：套用套件實際 class，只把固定寬改成跟著欄寬。
+       靠欄位左下角擺放，避開右上角 top-right 容器實際堆疊的區域，
+       免得樣張和真通知疊在一起看起來像 bug */
+    .hero__sample { display: grid; gap: 0.75rem; align-self: end; }
+    .hero__sample .glass-toast { width: min(24rem, 100%); }
+
+    /* --- 區塊 --- */
+
+    .section { padding-block: clamp(2.5rem, 6vw, 4rem); }
+    .section__head { max-width: 48ch; margin-bottom: clamp(1.5rem, 3vw, 2rem); }
+    .section h2 {
+      margin: 0 0 0.5rem;
+      font-size: clamp(1.5rem, 2.6vw, 2rem);
+      line-height: 1.25;
+      letter-spacing: -0.025em;
+    }
+    .section__head p { margin: 0; color: var(--ink-soft); }
+
+    .panel {
+      /* grid item 的自動最小尺寸預設是 min-content，程式碼區塊最長那行會把
+         整張面板撐出視窗；歸零後改由 .code 自己橫向捲動 */
+      min-width: 0;
+      padding: clamp(1.25rem, 2.5vw, 1.75rem);
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--r-panel);
+      box-shadow: var(--panel-shadow);
+      -webkit-backdrop-filter: blur(20px) saturate(150%);
+      backdrop-filter: blur(20px) saturate(150%);
+    }
+
+    /* 與套件同樣的後備：沒有 backdrop-filter 就改不透明底 */
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      .panel { background: var(--panel-opaque); }
+    }
+
+    /* --- Playground --- */
+
+    .pg { display: grid; gap: clamp(1rem, 2vw, 1.5rem); align-items: start; }
+    .pg__side { display: grid; gap: clamp(1rem, 2vw, 1.5rem); align-content: start; }
+    @media (min-width: 900px) {
+      .pg { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); }
+    }
+
+    .field { display: grid; gap: 0.5rem; }
+    .field + .field { margin-top: 1.35rem; }
+    .field__label { font-size: 0.8125rem; font-weight: 600; color: var(--ink); }
+    .field__hint { font-size: 0.75rem; color: var(--ink-faint); }
+
+    .variants { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+    @media (min-width: 560px) { .variants { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+    /* 變體鈕沿用套件的語意色（這是元件資料，不是第二個品牌色） */
+    .variant {
+      padding: 0.6rem 0.5rem;
+      border: 1px solid var(--v-border);
+      border-radius: var(--r-control);
+      background: var(--v-bg);
+      color: var(--v-ink);
+      font-family: var(--mono);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 120ms ease, filter 160ms ease;
+    }
+    .variant:hover { filter: brightness(1.04) saturate(1.1); }
+    .variant:active { transform: translateY(1px); }
+    .variant:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .variant--success { --v-bg: light-dark(#d0fae5, rgba(4, 120, 87, 0.24));  --v-ink: light-dark(#046c4e, #6ee7b7); --v-border: light-dark(rgba(4, 120, 87, 0.28), rgba(110, 231, 183, 0.26)); }
+    .variant--error   { --v-bg: light-dark(#ffe2e2, rgba(190, 24, 24, 0.24));  --v-ink: light-dark(#c22323, #fca5a5); --v-border: light-dark(rgba(194, 35, 35, 0.28), rgba(252, 165, 165, 0.26)); }
+    .variant--warning { --v-bg: light-dark(#fef3c6, rgba(180, 83, 9, 0.26));   --v-ink: light-dark(#a1490a, #fcd34d); --v-border: light-dark(rgba(161, 73, 10, 0.28), rgba(252, 211, 77, 0.26)); }
+    .variant--info    { --v-bg: light-dark(#e2eaf1, rgba(58, 91, 122, 0.30));  --v-ink: light-dark(#33536f, #a8c9e4); --v-border: light-dark(rgba(51, 83, 111, 0.28), rgba(168, 201, 228, 0.26)); }
+
+    .input {
+      width: 100%;
+      padding: 0.55rem 0.7rem;
+      background: var(--field-bg);
+      border: 1px solid var(--hairline-strong);
+      border-radius: var(--r-control);
+      color: var(--ink);
+      font: inherit;
+      font-family: var(--mono);
+      font-size: 0.875rem;
+    }
+    .input::placeholder { color: var(--ink-faint); opacity: 1; }
+    .input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+    .checks { display: grid; gap: 0.5rem; }
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.55rem 0.75rem;
+      background: var(--field-bg);
+      border: 1px solid var(--hairline);
+      border-radius: var(--r-control);
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    .check input { width: 1rem; height: 1rem; margin: 0; accent-color: var(--accent); }
+    .check:hover { border-color: var(--hairline-strong); }
+    .check code { font-family: var(--mono); font-size: 0.8125rem; color: var(--ink-soft); }
+
+    .lifecycle { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+    /* --- 程式碼面板 --- */
+
+    .code__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.9rem;
+    }
+    .code__title { font-size: 0.8125rem; font-weight: 600; color: var(--ink-soft); }
+
+    .code {
+      margin: 0;
+      padding: 1rem 1.1rem;
+      background: var(--code-bg);
+      border: 1px solid var(--hairline);
+      border-radius: var(--r-control);
+      font-family: var(--mono);
+      font-size: 0.8125rem;
+      line-height: 1.75;
+      color: var(--ink);
+      overflow-x: auto;
+      tab-size: 2;
+    }
+    .tok-kw  { color: var(--tok-kw); }
+    .tok-str { color: var(--tok-str); }
+    .tok-fn  { color: var(--tok-fn); }
+    .tok-num { color: var(--tok-num); }
+
+    /* --- 環境讀數：單一面板 + 髮絲線分欄，不是四張卡片 --- */
+
+    .env__grid { display: grid; margin: 0; padding: 0; list-style: none; }
+    .env__item { padding: 1rem 0; border-top: 1px solid var(--hairline); }
+    .env__item:first-child { padding-top: 0; border-top: 0; }
+
+    @media (min-width: 760px) {
+      .env__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .env__item { padding: 0 1.35rem; border-top: 0; border-left: 1px solid var(--hairline); }
+      .env__item:first-child { padding-left: 0; border-left: 0; }
+      .env__item:last-child { padding-right: 0; }
+    }
+
+    .env__key { font-family: var(--mono); font-size: 0.75rem; color: var(--ink-faint); }
+    .env__val { margin: 0.4rem 0 0.25rem; font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.01em; }
+    .env__note { margin: 0; font-size: 0.8125rem; color: var(--ink-soft); }
+
+    /* --- 頁尾 --- */
+
+    .footer {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-top: clamp(2rem, 5vw, 3rem);
+      padding-block: 2rem 3rem;
+      border-top: 1px solid var(--hairline);
+      font-size: 0.875rem;
+      color: var(--ink-soft);
+    }
+
+    /* --- 進場 ---
+       隱藏初始狀態同時要求兩個前提：使用者未要求減少動態，且 JS 已接手負責
+       補上 is-in（.js-reveal 由腳本掛上）。腳本掛掉時內容維持可見，不會空白 */
+
+    @media (prefers-reduced-motion: no-preference) {
+      /* :where() 把前置條件壓成零 specificity，隱藏規則才不會蓋過 .rise.is-in */
+      :where(:root.js-reveal) .rise { opacity: 0; transform: translateY(14px); }
+      .rise.is-in {
+        opacity: 1;
+        transform: none;
+        transition: opacity 620ms cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0ms),
+                    transform 620ms cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0ms);
+      }
+    }
+  </style>
+  <script>
+    // 首次繪製前就決定要不要跑進場動畫：沒有 IntersectionObserver 就不藏，
+    // 內容一律直接顯示。放在 head 是為了避免「先顯示再被藏起來」的閃爍。
+    if ('IntersectionObserver' in window) document.documentElement.classList.add('js-reveal');
+  </script>
+</head>
+<body>
+  <div class="scene" aria-hidden="true">
+    <div class="scene__aurora"></div>
+    <div class="scene__photo"></div>
+    <div class="scene__scrim"></div>
+  </div>
+
+  <div class="page">
+    <header class="wrap topbar">
+      <span class="brand">
+        <span id="brand-name">glass-toast</span>
+        <span class="brand__version" id="brand-version">v0.0.0</span>
+      </span>
+
+      <span class="seg">
+        <span class="seg__label" id="theme-label">外觀</span>
+        <span class="seg__track" role="radiogroup" aria-labelledby="theme-label">
+          <label class="seg__opt"><input type="radio" name="theme" value="system" checked><span>系統</span></label>
+          <label class="seg__opt"><input type="radio" name="theme" value="light"><span>淺色</span></label>
+          <label class="seg__opt"><input type="radio" name="theme" value="dark"><span>深色</span></label>
+        </span>
+      </span>
+
+      <span class="seg">
+        <span class="seg__label" id="backdrop-label">背景</span>
+        <span class="seg__track" role="radiogroup" aria-labelledby="backdrop-label">
+          <label class="seg__opt"><input type="radio" name="backdrop" value="aurora" checked><span>漸層</span></label>
+          <label class="seg__opt"><input type="radio" name="backdrop" value="photo"><span>照片</span></label>
+          <label class="seg__opt"><input type="radio" name="backdrop" value="flat"><span>純色</span></label>
+        </span>
+      </span>
+    </header>
+
+    <main>
+      <section class="wrap hero">
+        <div class="rise">
+          <h1><span class="nowrap">毛玻璃 toast，</span><span class="nowrap"><b>零相依</b>開箱即用</span></h1>
+          <p class="hero__sub">vanilla JS 寫成，不需要 React、Tailwind 或任何建置設定。</p>
+          <div class="hero__cta">
+            <button class="btn btn--primary" id="hero-try" type="button">試一則通知</button>
+            <span class="cmd">
+              <code id="install-cmd">npm i @dennykuo/glass-toast</code>
+              <button class="btn btn--mini" id="copy-install" type="button" aria-label="複製安裝指令">複製</button>
+            </span>
+          </div>
+        </div>
+
+        <!-- 產品樣張：直接套用套件實際 class 與圖示，不是仿造的截圖 -->
+        <div class="hero__sample rise" id="sample" style="--d: 90ms" aria-hidden="true" inert></div>
+      </section>
+
+      <section class="wrap section" id="playground">
+        <div class="section__head rise">
+          <h2>試玩每個參數</h2>
+          <p>調整設定後按下變體，通知會用這組參數送出；產生的程式碼同步更新，可直接複製帶走。</p>
+        </div>
+
+        <div class="pg">
+          <div class="panel rise">
+            <div class="field">
+              <span class="field__label">變體</span>
+              <div class="variants">
+                <button class="variant variant--success" type="button" data-type="success">success</button>
+                <button class="variant variant--error" type="button" data-type="error">error</button>
+                <button class="variant variant--warning" type="button" data-type="warning">warning</button>
+                <button class="variant variant--info" type="button" data-type="info">info</button>
+              </div>
+              <span class="field__hint">按下即以目前設定送出一則通知。</span>
+            </div>
+
+            <div class="field">
+              <span class="field__label" id="position-label">位置</span>
+              <span class="seg__track" role="radiogroup" aria-labelledby="position-label" style="align-self: start">
+                <label class="seg__opt"><input type="radio" name="position" value="top-right" checked><span>top-right</span></label>
+                <label class="seg__opt"><input type="radio" name="position" value="bottom-right"><span>bottom-right</span></label>
+                <label class="seg__opt"><input type="radio" name="position" value="bottom-center"><span>bottom-center</span></label>
+              </span>
+            </div>
+
+            <div class="field">
+              <label class="field__label" for="duration">停留時間（毫秒）</label>
+              <input class="input" id="duration" type="number" step="500" min="0" placeholder="留空使用變體預設">
+              <span class="field__hint">留空走預設：error 為 10000、其餘 5500。填 0 等同 persistent。</span>
+            </div>
+
+            <div class="field">
+              <span class="field__label">選項</span>
+              <div class="checks">
+                <label class="check"><input type="checkbox" id="persistent"> 不自動消失 <code>persistent: true</code></label>
+                <label class="check"><input type="checkbox" id="action"> 附「重試」按鈕 <code>action</code></label>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="pg__side">
+            <div class="panel rise" style="--d: 90ms">
+              <div class="code__head">
+                <span class="code__title">目前設定產生的呼叫</span>
+                <button class="btn btn--mini" type="button" id="copy-code" aria-label="複製程式碼">複製</button>
+              </div>
+              <pre class="code"><code id="snippet"></code></pre>
+            </div>
+
+            <div class="panel rise" style="--d: 150ms">
+              <div class="field">
+                <span class="field__label">批次與生命週期</span>
+                <div class="lifecycle">
+                  <button class="btn btn--ghost" type="button" id="burst">四連發</button>
+                  <button class="btn btn--ghost" type="button" id="dismiss-all">dismissAll()</button>
+                  <button class="btn btn--ghost" type="button" id="suppress">dismissAll({ suppress: true })</button>
+                  <button class="btn btn--ghost" type="button" id="resume">resume()</button>
+                </div>
+                <span class="field__hint">suppress 會鎖住後續 show()，要用 resume() 或重載頁面解鎖。</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="wrap section" id="env">
+        <div class="section__head rise">
+          <h2>你的瀏覽器現在怎麼降級</h2>
+          <p>以下數值即時讀自 matchMedia 與 CSS.supports，改動系統設定會立刻反映在這裡與通知本身。</p>
+        </div>
+
+        <div class="panel rise">
+          <ul class="env__grid">
+            <li class="env__item">
+              <span class="env__key">backdrop-filter</span>
+              <p class="env__val" id="env-blur">偵測中</p>
+              <p class="env__note" id="env-blur-note"></p>
+            </li>
+            <li class="env__item">
+              <span class="env__key">prefers-reduced-motion</span>
+              <p class="env__val" id="env-motion">偵測中</p>
+              <p class="env__note" id="env-motion-note"></p>
+            </li>
+            <li class="env__item">
+              <span class="env__key">prefers-color-scheme</span>
+              <p class="env__val" id="env-scheme">偵測中</p>
+              <p class="env__note" id="env-scheme-note"></p>
+            </li>
+            <li class="env__item">
+              <span class="env__key">套用中的外觀</span>
+              <p class="env__val" id="env-applied">偵測中</p>
+              <p class="env__note" id="env-applied-note"></p>
+            </li>
+          </ul>
+        </div>
+      </section>
+    </main>
+
+    <footer class="wrap footer">
+      <span>MIT License © Denny</span>
+      <a id="npm-link" href="https://www.npmjs.com/package/@dennykuo/glass-toast">在 npm 上查看</a>
+    </footer>
+  </div>
+
+  <script type="module">
+    import { register } from '../src/index.js';
+    import { ICONS } from '../src/icons.js';
+    import pkg from '../package.json';
+
+    const toast = register(); // 樣式自動注入 + window.toast
+
+    // --- 套件後設資料：統一來自 package.json，不在頁面裡重寫一份 ---
+
+    const shortName = pkg.name.split('/').pop();
+    document.getElementById('brand-name').textContent = shortName;
+    document.getElementById('brand-version').textContent = `v${pkg.version}`;
+    const installCmd = `npm i ${pkg.name}`;
+    document.getElementById('install-cmd').textContent = installCmd;
+    document.getElementById('npm-link').href = `https://www.npmjs.com/package/${pkg.name}`;
+
+    const MESSAGES = {
+      success: '資料已成功儲存，變更即刻生效。',
+      error: '連線逾時，請稍後再試一次。',
+      warning: '尚有未儲存的變更，離開前請先確認。',
+      info: '系統將於今晚 23:00 進行例行維護。',
+    };
+
+    const RETRY_ACTION = { label: '重試', onClick: () => toast.success('已重新送出') };
+
+    // --- 目前設定 ---
+
+    const checked = (name) => document.querySelector(`input[name="${name}"]:checked`).value;
+    const durationInput = document.getElementById('duration');
+    const persistentInput = document.getElementById('persistent');
+    const actionInput = document.getElementById('action');
+
+    function currentOptions() {
+      const raw = durationInput.value.trim();
+      return {
+        position: checked('position'),
+        // 留空 = 不傳 duration，讓變體預設生效
+        duration: raw === '' ? undefined : Number(raw),
+        persistent: persistentInput.checked,
+        withAction: actionInput.checked,
+      };
+    }
+
+    let lastType = 'success'; // 程式碼區塊顯示的變體，跟著最近一次觸發走
+
+    function fire(type) {
+      lastType = type;
+      const { position, duration, persistent, withAction } = currentOptions();
+      toast.show(MESSAGES[type], {
+        type,
+        position,
+        persistent,
+        ...(duration === undefined ? {} : { duration }),
+        ...(withAction ? { action: RETRY_ACTION } : {}),
+      });
+      renderSnippet();
+    }
+
+    // --- 程式碼產生（只列出偏離預設的選項，順便把預設值教出來） ---
+
+    function buildSnippet() {
+      const { position, duration, persistent, withAction } = currentOptions();
+      const entries = [];
+      if (position !== 'top-right') entries.push(`  position: '${position}',`);
+      if (duration !== undefined && !Number.isNaN(duration)) entries.push(`  duration: ${duration},`);
+      if (persistent) entries.push('  persistent: true,');
+      if (withAction) entries.push("  action: { label: '重試', onClick: () => retryUpload() },");
+
+      const head = [
+        `import { register } from '${pkg.name}';`,
+        '',
+        'const toast = register();',
+        '',
+      ];
+      const call = entries.length
+        ? [`toast.${lastType}('${MESSAGES[lastType]}', {`, ...entries, '});']
+        : [`toast.${lastType}('${MESSAGES[lastType]}');`];
+
+      return [...head, ...call].join('\n');
+    }
+
+    // 自產程式碼的極簡高亮：全程 textContent，不碰 innerHTML
+    const TOKEN_RE = /(?<str>'[^']*')|(?<kw>\b(?:import|from|const|true|false)\b)|(?<fn>\b[A-Za-z_$][\w$]*(?=\s*\())|(?<num>\b\d+\b)/g;
+
+    const snippetEl = document.getElementById('snippet');
+    let snippetText = '';
+
+    function renderSnippet() {
+      snippetText = buildSnippet();
+      snippetEl.textContent = '';
+      let cursor = 0;
+      for (const match of snippetText.matchAll(TOKEN_RE)) {
+        if (match.index > cursor) snippetEl.append(snippetText.slice(cursor, match.index));
+        const kind = Object.keys(match.groups).find((k) => match.groups[k] !== undefined);
+        const span = document.createElement('span');
+        span.className = `tok-${kind}`;
+        span.textContent = match[0];
+        snippetEl.append(span);
+        cursor = match.index + match[0].length;
+      }
+      if (cursor < snippetText.length) snippetEl.append(snippetText.slice(cursor));
+    }
+
+    // --- Hero 樣張：用套件實際的 class 與圖示組出真元件，不是仿造截圖 ---
+
+    function sampleToast(type, message, actionLabel) {
+      const el = document.createElement('div');
+      el.className = `glass-toast glass-toast--${type}`;
+      el.dataset.position = 'top-right';
+
+      const icon = document.createElement('span');
+      icon.className = 'glass-toast__icon';
+      icon.innerHTML = ICONS[type];
+
+      const msg = document.createElement('p');
+      msg.className = 'glass-toast__message';
+      msg.textContent = message;
+
+      el.append(icon, msg);
+
+      if (actionLabel) {
+        const action = document.createElement('button');
+        action.type = 'button';
+        action.className = 'glass-toast__action';
+        action.tabIndex = -1;
+        action.textContent = actionLabel;
+        el.append(action);
+      }
+
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'glass-toast__close';
+      close.tabIndex = -1;
+      close.innerHTML = ICONS.close;
+      el.append(close);
+
+      return el;
+    }
+
+    // 樣張文字刻意與 MESSAGES 不同：真通知飄到附近時才不會看起來像重複渲染
+    document.getElementById('sample').append(
+      sampleToast('success', '設定已同步到所有裝置。'),
+      sampleToast('error', '上傳失敗，是否重試？', '重試'),
+    );
+
+    // --- 事件 ---
+
+    document.querySelectorAll('[data-type]').forEach((btn) => {
+      btn.addEventListener('click', () => fire(btn.dataset.type));
+    });
+
+    document.getElementById('hero-try').addEventListener('click', () => fire('success'));
+
+    document.getElementById('burst').addEventListener('click', () => {
+      for (const type of ['success', 'error', 'warning', 'info']) fire(type);
+    });
+
+    document.getElementById('dismiss-all').addEventListener('click', () => toast.dismissAll());
+    document.getElementById('suppress').addEventListener('click', () => {
+      toast.dismissAll({ suppress: true });
+    });
+    document.getElementById('resume').addEventListener('click', () => {
+      toast.resume();
+      toast.info('已解除靜音，show() 恢復作用。');
+    });
+
+    for (const el of [durationInput, persistentInput, actionInput]) {
+      el.addEventListener('input', renderSnippet);
+    }
+    document.querySelectorAll('input[name="position"]').forEach((el) => {
+      el.addEventListener('change', renderSnippet);
+    });
+
+    // 複製：用套件自己的通知回報結果，順便示範成功與失敗兩種狀態
+    async function copy(text, label) {
+      try {
+        await navigator.clipboard.writeText(text);
+        toast.success(`已複製${label}`);
+      } catch {
+        toast.error(`無法存取剪貼簿，請手動複製${label}`);
+      }
+    }
+
+    document.getElementById('copy-install').addEventListener('click', () => copy(installCmd, '安裝指令'));
+    document.getElementById('copy-code').addEventListener('click', () => copy(snippetText, '程式碼'));
+
+    // --- 外觀與背景 ---
+
+    const html = document.documentElement;
+
+    document.querySelectorAll('input[name="theme"]').forEach((el) => {
+      el.addEventListener('change', () => {
+        if (el.value === 'system') delete html.dataset.theme;
+        else html.dataset.theme = el.value;
+        renderEnv();
+      });
+    });
+
+    document.querySelectorAll('input[name="backdrop"]').forEach((el) => {
+      el.addEventListener('change', () => { html.dataset.backdrop = el.value; });
+    });
+
+    // --- 環境讀數 ---
+
+    const mqDark = window.matchMedia('(prefers-color-scheme: dark)');
+    const mqMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const supportsBlur =
+      CSS.supports('backdrop-filter', 'blur(1px)') ||
+      CSS.supports('-webkit-backdrop-filter', 'blur(1px)');
+
+    const setEnv = (id, value, note) => {
+      document.getElementById(`env-${id}`).textContent = value;
+      document.getElementById(`env-${id}-note`).textContent = note;
+    };
+
+    function renderEnv() {
+      setEnv('blur', supportsBlur ? '支援' : '不支援',
+        supportsBlur ? '毛玻璃生效，外殼半透明。' : '自動退回不透明底，維持可讀性。');
+
+      setEnv('motion', mqMotion.matches ? 'reduce' : 'no-preference',
+        mqMotion.matches ? '純淡入、無位移與 glow，倒數條保留。' : '完整進退場與 glow 脈衝。');
+
+      setEnv('scheme', mqDark.matches ? 'dark' : 'light', '作業系統目前的偏好設定。');
+
+      const manual = html.dataset.theme;
+      const isDark = manual ? manual === 'dark' : mqDark.matches;
+      setEnv('applied', isDark ? '深色毛玻璃' : '淺色毛玻璃',
+        manual ? `由 data-theme="${manual}" 指定，覆蓋系統偏好。` : '未指定 data-theme，跟隨系統偏好。');
+    }
+
+    mqDark.addEventListener('change', renderEnv);
+    mqMotion.addEventListener('change', renderEnv);
+
+    // --- 進場（IntersectionObserver，不掛 scroll 監聽） ---
+
+    const rises = document.querySelectorAll('.rise');
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          entry.target.classList.add('is-in');
+          io.unobserve(entry.target);
+        }
+      }, { threshold: 0.15 });
+      rises.forEach((el) => io.observe(el));
+    } else {
+      rises.forEach((el) => el.classList.add('is-in'));
+    }
+
+    // --- 起始狀態 ---
+
+    renderSnippet();
+    renderEnv();
+
+    // 開場先送一則真通知：比任何靜態說明都快讓人看懂這個元件在做什麼。
+    // 窄視窗跳過：toast 寬度接近滿版會蓋住頂列控制項，且「游標 / Tab」對觸控裝置無意義
+    if (window.matchMedia('(min-width: 768px)').matches) {
+      setTimeout(() => {
+        toast.info('這就是 glass-toast。游標移上來或用 Tab 聚焦，倒數會暫停。');
+      }, 800);
+    }
+  </script>
+</body>
+</html>

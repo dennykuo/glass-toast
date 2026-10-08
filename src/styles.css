@@ -1,0 +1,319 @@
+/* ==========================================================================
+   glass-toast — 毛玻璃 toast 通知（零相依 plain CSS）
+
+   所有顏色走 CSS custom properties（--gt-*），變數 scope 在 .glass-toast
+   不污染 :root。消費端在自己的 stylesheet 覆蓋即可換色：
+
+     .glass-toast { --gt-text: #333; }
+     .glass-toast--success { --gt-icon: #0a7d4f; }
+
+   light 預設值鎖定 Tailwind v4 內建色的實際 sRGB 渲染值（圖示取 700 階
+   確保 icon 對藥丸底 ≥3:1 非文字對比）；dark 為真正的「深色毛玻璃」
+   （低亮度半透明底 + 淺字），不再是刺眼白卡。
+   ========================================================================== */
+
+.glass-toast-container,
+.glass-toast,
+.glass-toast * {
+    box-sizing: border-box;
+}
+
+/* --- 容器（惰性建立，per position） --- */
+
+.glass-toast-container {
+    position: fixed;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    /* 刻意用 32-bit 最大值：通知屬最上層 UI，確保永遠不被宿主的 modal/overlay 蓋住 */
+    z-index: 2147483647;
+    pointer-events: none;
+}
+
+.glass-toast-container--top-right {
+    top: 1rem;
+    right: 1rem;
+    align-items: flex-end;
+}
+
+.glass-toast-container--bottom-right {
+    bottom: 1rem;
+    right: 1rem;
+    align-items: flex-end;
+}
+
+.glass-toast-container--bottom-center {
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    align-items: center;
+}
+
+/* --- 外殼（毛玻璃 + 多層陰影） --- */
+
+.glass-toast {
+    /* 主題變數（light 預設） */
+    --gt-bg: rgba(255, 255, 255, 0.8);
+    --gt-bg-opaque: rgba(255, 255, 255, 0.96); /* backdrop-filter 不支援時的後備 */
+    --gt-border: rgba(229, 231, 235, 0.4);     /* gray-200 @ 40% */
+    --gt-text: #4a5565;                        /* gray-600 */
+    --gt-blur: 24px;
+    --gt-radius: 1rem;
+    --gt-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --gt-close-bg: #f9fafb;                    /* gray-50 */
+    --gt-close-border: #e5e7eb;                /* gray-200 */
+    --gt-close-text: #99a1af;                  /* gray-400 */
+    --gt-close-bg-hover: #f3f4f6;              /* gray-100 */
+    --gt-close-border-hover: #d1d5dc;          /* gray-300 */
+    --gt-close-text-hover: #4a5565;            /* gray-600 */
+    --gt-focus-ring: #2563eb;                  /* blue-600：對淺底 ≥3:1，focus 明確 */
+
+    pointer-events: auto;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 24rem;
+    max-width: calc(100vw - 2rem);
+    padding: 0.875rem 1rem;
+    overflow: hidden;
+    background-color: var(--gt-bg);
+    -webkit-backdrop-filter: blur(var(--gt-blur));
+    backdrop-filter: blur(var(--gt-blur));
+    border: 1px solid var(--gt-border);
+    border-radius: var(--gt-radius);
+    box-shadow: var(--gt-shadow);
+}
+
+/* backdrop-filter 不支援（舊 Firefox 等）：改更不透明底保持可讀 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass-toast {
+        background-color: var(--gt-bg-opaque);
+    }
+}
+
+/* --- 變體：藥丸底 / 圖示 / 進度條 / glow ring RGB（供 JS 讀取餵 el.animate） ---
+   圖示取 700 階（與 dark 一致），確保 icon 對藥丸底達 ≥3:1 非文字對比門檻 */
+
+.glass-toast--success {
+    --gt-pill-bg: #d0fae5; /* emerald-100 */
+    --gt-icon: #047857;    /* emerald-700 */
+    --gt-bar: #00bb7f;     /* emerald-500 */
+    --gt-ring: 16, 185, 129;
+}
+
+.glass-toast--error {
+    --gt-pill-bg: #ffe2e2; /* red-100 */
+    --gt-icon: #dc2626;    /* red-600 */
+    --gt-bar: #ff6568;     /* red-400 */
+    --gt-ring: 239, 68, 68;
+}
+
+.glass-toast--warning {
+    --gt-pill-bg: #fef3c6; /* amber-100 */
+    --gt-icon: #b45309;    /* amber-700 */
+    --gt-bar: #fcbb00;     /* amber-400 */
+    --gt-ring: 245, 158, 11;
+}
+
+.glass-toast--info {
+    --gt-pill-bg: #e2eaf1; /* brand-100 */
+    --gt-icon: #3a5b7a;    /* brand-600 */
+    --gt-bar: #6f92ad;     /* brand-400 */
+    --gt-ring: 76, 112, 144;
+}
+
+/* --- 進退場動畫（280ms 對齊產品慣例；JS TOAST_ANIM_MS 需同步） --- */
+
+.glass-toast--animated {
+    transition: all 280ms cubic-bezier(0, 0, 0.2, 1); /* 進場 ease-out */
+}
+
+.glass-toast--leaving {
+    transition-timing-function: cubic-bezier(0.4, 0, 1, 1); /* 退場 ease-in */
+}
+
+/* 進場隱藏態：滑入軸向由 data-position 決定；--faded 為 reduced motion 純淡入 */
+.glass-toast--enter,
+.glass-toast--faded {
+    opacity: 0;
+}
+
+.glass-toast--enter[data-position="top-right"],
+.glass-toast--enter[data-position="bottom-right"] {
+    transform: translateX(2rem);
+}
+
+.glass-toast--enter[data-position="bottom-center"] {
+    transform: translateY(2rem);
+}
+
+/* --- 圖示：彩色藥丸底 --- */
+
+.glass-toast__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 0.5rem;
+    background-color: var(--gt-pill-bg);
+    color: var(--gt-icon);
+}
+
+.glass-toast__icon svg {
+    display: block;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+/* --- 訊息文字 --- */
+
+.glass-toast__message {
+    flex: 1 1 0%;
+    min-width: 0;             /* 允許 flex 子項收縮，長字串不撐破容器 */
+    margin: 0;
+    font-size: 0.9375rem; /* 15px */
+    line-height: 1.625;
+    color: var(--gt-text);
+    overflow-wrap: anywhere;  /* 長不斷字串強制換行 */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 5;    /* 極長訊息最多 5 行，超出省略，避免無限膨脹 */
+    line-clamp: 5;
+    overflow: hidden;
+}
+
+/* --- Action 按鈕（可選；渲染在訊息與關閉鈕之間，取變體色） --- */
+
+.glass-toast__action {
+    flex-shrink: 0;
+    align-self: center;
+    padding: 0.3125rem 0.75rem;
+    border: 1px solid var(--gt-action-border, var(--gt-border));
+    border-radius: 0.5rem;
+    background-color: var(--gt-action-bg, transparent);
+    color: var(--gt-action-text, var(--gt-icon));
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    appearance: none;
+    transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-toast__action:hover {
+    background-color: var(--gt-action-bg-hover, var(--gt-pill-bg));
+}
+
+.glass-toast__action:focus-visible {
+    outline: 2px solid var(--gt-focus-ring);
+    outline-offset: 2px;
+}
+
+/* --- 關閉按鈕：in-flow、靠右、圓形帶圈（flex align-items 垂直置中） --- */
+
+.glass-toast__close {
+    flex-shrink: 0;
+    align-self: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 1px solid var(--gt-close-border);
+    border-radius: 9999px;
+    background-color: var(--gt-close-bg);
+    color: var(--gt-close-text);
+    font: inherit;
+    cursor: pointer;
+    appearance: none;
+    transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-toast__close:hover {
+    background-color: var(--gt-close-bg-hover);
+    border-color: var(--gt-close-border-hover);
+    color: var(--gt-close-text-hover);
+}
+
+.glass-toast__close:focus-visible {
+    outline: 2px solid var(--gt-focus-ring);
+    outline-offset: 2px;
+}
+
+.glass-toast__close svg {
+    display: block;
+    width: 0.875rem;
+    height: 0.875rem;
+}
+
+/* --- 倒數進度條 --- */
+
+.glass-toast__bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    border-radius: 9999px;
+    background-color: var(--gt-bar);
+    opacity: 0.4;
+}
+
+/* --- responsive（≥768px 桌機微縮訊息字級；關閉鈕維持 32px 觸控友善） --- */
+
+@media (min-width: 768px) {
+    .glass-toast__message {
+        font-size: 14px;
+    }
+}
+
+/* ==========================================================================
+   Dark — 真正的深色毛玻璃（低亮度半透明底 + 淺字），保留玻璃身分、避免夜間眩光
+
+   三種慣例都命中：
+     1. OS 深色（prefers-color-scheme），但頁面明示 light 時讓路
+     2. [data-theme="dark"]（本專案 / Astro 慣例）
+     3. .dark class（Tailwind 慣例）
+   :where() 把 html 端選擇器壓成零 specificity，整條規則與 base 同權重、
+   靠檔案順序（後者勝）生效，消費端覆蓋不需要提高 specificity。
+
+   變體藥丸/圖示/進度條沿用 base（淺色亮片 + 700 階圖示在深底上仍清晰），
+   只覆寫外殼、關閉鈕與 focus ring，DRY 且一致。
+   ========================================================================== */
+
+@media (prefers-color-scheme: dark) {
+    :where(:root:not([data-theme="light"]):not(.light)) .glass-toast {
+        --gt-bg: rgba(28, 28, 30, 0.72);
+        --gt-bg-opaque: rgba(28, 28, 30, 0.92);
+        --gt-border: rgba(255, 255, 255, 0.10);
+        --gt-text: #e5e7eb;                    /* gray-200 */
+        --gt-close-bg: rgba(255, 255, 255, 0.06);
+        --gt-close-border: rgba(255, 255, 255, 0.12);
+        --gt-close-text: #cbd5e1;              /* slate-300 */
+        --gt-close-bg-hover: rgba(255, 255, 255, 0.12);
+        --gt-close-border-hover: rgba(255, 255, 255, 0.22);
+        --gt-close-text-hover: #f1f5f9;        /* slate-100 */
+        --gt-focus-ring: #93c5fd;              /* blue-300：對深底 focus 明確 */
+    }
+}
+
+:where([data-theme="dark"], .dark) .glass-toast {
+    --gt-bg: rgba(28, 28, 30, 0.72);
+    --gt-bg-opaque: rgba(28, 28, 30, 0.92);
+    --gt-border: rgba(255, 255, 255, 0.10);
+    --gt-text: #e5e7eb;
+    --gt-close-bg: rgba(255, 255, 255, 0.06);
+    --gt-close-border: rgba(255, 255, 255, 0.12);
+    --gt-close-text: #cbd5e1;
+    --gt-close-bg-hover: rgba(255, 255, 255, 0.12);
+    --gt-close-border-hover: rgba(255, 255, 255, 0.22);
+    --gt-close-text-hover: #f1f5f9;
+    --gt-focus-ring: #93c5fd;
+}
