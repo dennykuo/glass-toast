@@ -27,7 +27,8 @@
   "sideEffects": [
     "**/*.css",
     "./dist/auto.js",
-    "./src/auto.js"
+    "./src/auto.js",
+    "./docs/**"
   ],
   "main": "./dist/glass-toast.umd.cjs",
   "module": "./dist/glass-toast.js",
@@ -54,7 +55,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "dev": "vite demo",
+    "dev": "vite docs",
+    "build:docs": "vite build docs",
     "build": "vite build && vite build --mode umd && node scripts/build-css.mjs && tsc -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",

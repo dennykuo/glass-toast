@@ -152,11 +152,29 @@ dark 覆寫全部走 `:where()` 壓成與 base 相同的 specificity，你的覆
 ## 開發
 
 ```bash
-npm run dev     # vite demo（互動 playground：四變體 × 三位置 × 深淺外觀 × 三種背景底圖）
-npm test        # vitest + jsdom（58 tests）
-npm run lint    # eslint
-npm run build   # dist/：ESM + UMD + CSS + .d.ts
+npm run dev         # 文件站：/ 文件、/demo.html 互動 playground
+npm test            # vitest + jsdom（含文件覆蓋率守門）
+npm run lint        # eslint
+npm run build       # dist/：ESM + UMD + CSS + .d.ts
+npm run build:docs  # dist-docs/：文件站靜態檔（相對路徑，可直接部署到 GitHub Pages）
 ```
+
+文件站整個放在 `docs/`：
+
+```
+docs/
+  index.html        文件（首頁）
+  demo.html         互動 playground
+  partials/         共用 HTML 片段，由 vite.config.js 在建置時插入
+  site.css          共用樣式
+  site.js           共用腳本
+  scrollspy.js      文件目錄的捲動同步判斷（純函式，test/scrollspy.test.js）
+  vite.config.js    文件站設定（vite docs 自動讀取）
+```
+
+頁面一律平放在 `docs/` 根目錄，partial 裡的站內連結都寫 `./`；套件名稱與版本以 `%PKG_NAME%` 等從 `package.json` 帶入。
+
+`test/docs.test.js` 會從原始碼掃出公開 API、`show()` / `register()` 選項與所有 `--gt-*` 變數，逐一確認 `docs/index.html` 有對應的 `data-doc` 條目——新增 API 時記得一併補文件。
 
 ## License
 

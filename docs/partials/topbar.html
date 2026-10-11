@@ -1,0 +1,29 @@
+<header class="wrap topbar">
+  <a class="brand" href="./">
+    <span>%PKG_SHORT_NAME%</span>
+    <span class="brand__version">v%PKG_VERSION%</span>
+  </a>
+
+  <nav class="nav" aria-label="網站">
+    <a href="./" data-page="index">文件</a>
+    <a href="./demo.html" data-page="demo">Demo</a>
+  </nav>
+
+  <span class="seg">
+    <span class="seg__label" id="theme-label">外觀</span>
+    <span class="seg__track" role="radiogroup" aria-labelledby="theme-label">
+      <label class="seg__opt"><input type="radio" name="theme" value="system" checked><span>系統</span></label>
+      <label class="seg__opt"><input type="radio" name="theme" value="light"><span>淺色</span></label>
+      <label class="seg__opt"><input type="radio" name="theme" value="dark"><span>深色</span></label>
+    </span>
+  </span>
+
+  <span class="seg">
+    <span class="seg__label" id="backdrop-label">背景</span>
+    <span class="seg__track" role="radiogroup" aria-labelledby="backdrop-label">
+      <label class="seg__opt"><input type="radio" name="backdrop" value="aurora" checked><span>漸層</span></label>
+      <label class="seg__opt"><input type="radio" name="backdrop" value="photo"><span>照片</span></label>
+      <label class="seg__opt"><input type="radio" name="backdrop" value="flat"><span>純色</span></label>
+    </span>
+  </span>
+</header>

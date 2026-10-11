@@ -1,0 +1,392 @@
+/* ======================================================================
+   示範站共用樣式（demo + 文件）— 與套件同調：零相依、純 CSS、無 webfont
+   （不拖慢 LCP，也不讓「零相依元件」的櫥窗自己去載三支字型）。
+
+   深淺色只維護一組 token：light-dark() 依 :root 的 color-scheme 解析，
+   [data-theme] 只需切 color-scheme，就與套件的
+   prefers-color-scheme / [data-theme="dark"] 兩種慣例同步。
+
+   各頁專屬的版面寫在該頁的 <style>，這裡只放兩頁都用得到的部件。
+   ====================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+:root {
+  color-scheme: light dark;
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  /* --- 顏色：單一 accent（取自套件 info 變體的品牌藍），全頁不換色 --- */
+  --page-bg:      light-dark(#e8edf4, #070a11);
+  --ink:          light-dark(#152233, #e7eef6);
+  --ink-soft:     light-dark(#42566e, #a9bacd);
+  --ink-faint:    light-dark(#5d6f85, #8b9cae);
+  --accent:       light-dark(#2f5875, #a8c9e4);
+  --accent-hover: light-dark(#24455c, #c4dcf0);
+  --accent-ink:   light-dark(#ffffff, #0b1522);
+  --hairline:        light-dark(rgba(21, 34, 51, 0.12), rgba(231, 238, 246, 0.12));
+  --hairline-strong: light-dark(rgba(21, 34, 51, 0.20), rgba(231, 238, 246, 0.22));
+
+  /* --- 玻璃面板：與套件同語彙，但更低對比，不跟主角搶戲 --- */
+  --panel-bg:      light-dark(rgba(255, 255, 255, 0.55), rgba(20, 27, 38, 0.55));
+  --panel-opaque:  light-dark(rgba(255, 255, 255, 0.93), rgba(20, 27, 38, 0.94));
+  --panel-border:  light-dark(rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.08));
+  --panel-shadow:  light-dark(0 24px 60px -34px rgba(15, 35, 60, 0.5), 0 24px 60px -34px rgba(0, 0, 0, 0.75));
+  --field-bg:      light-dark(rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.05));
+  --field-on:      light-dark(#ffffff, rgba(255, 255, 255, 0.11));
+  --code-bg:       light-dark(rgba(255, 255, 255, 0.5), rgba(8, 12, 19, 0.5));
+
+  /* --- 背景場景 --- */
+  --aurora-1: light-dark(rgba(56, 189, 248, 0.34), rgba(56, 189, 248, 0.20));
+  --aurora-2: light-dark(rgba(45, 212, 191, 0.26), rgba(45, 212, 191, 0.16));
+  --aurora-3: light-dark(rgba(251, 191, 36, 0.22), rgba(251, 146, 60, 0.14));
+  --aurora-4: light-dark(rgba(251, 113, 133, 0.20), rgba(251, 113, 133, 0.14));
+  --scrim:    light-dark(rgba(232, 237, 244, 0.76), rgba(7, 10, 17, 0.80));
+
+  /* --- 圓角尺標（只有兩級 + 圓鈕）：面板 20 / 控制項 10 / 全圓 --- */
+  --r-panel: 20px;
+  --r-control: 10px;
+  --r-inner: 7px;   /* 巢狀於 3px padding 的控制項內層 */
+  --r-pill: 999px;
+
+  /* --- 語法高亮 --- */
+  --tok-kw:  light-dark(#8a3ea8, #d9b4ef);
+  --tok-str: light-dark(#0a6b4a, #86dcb4);
+  --tok-fn:  light-dark(#1d5f8a, #8ec8ef);
+  --tok-num: light-dark(#96470f, #f2b57f);
+  --tok-com: var(--ink-faint);
+}
+
+/* 手動指定時鎖住 color-scheme，light-dark() 與套件的 dark 規則一起翻面 */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"]  { color-scheme: dark; }
+
+/* 照片底圖明暗跨度大（雪地到夜空），次要文字若沿用漸層模式的色階，
+   壓在最暗岩壁或最亮雪地上會掉到 3:1 上下。此模式把次要色階往主色靠，
+   量測後最壞情況仍有 4.5:1 */
+:root[data-backdrop="photo"] {
+  --ink-soft:  light-dark(#2f4055, #a9bacd);
+  --ink-faint: light-dark(#35475d, #9dadbe);
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background-color: var(--page-bg);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+               "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 300ms ease, color 300ms ease;
+}
+
+a { color: var(--accent); text-underline-offset: 3px; }
+
+/* 中文沒有詞間空白，交給瀏覽器斷行會把詞拆得莫名其妙；
+   把短句包成不可斷行單位，換行只發生在標點後 */
+.nowrap { white-space: nowrap; }
+
+/* --- 背景場景：三種底圖讓開發者實地驗證 backdrop-filter --- */
+
+.scene { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.scene > * { position: absolute; inset: 0; transition: opacity 450ms ease; }
+
+.scene__aurora {
+  background-image:
+    radial-gradient(40rem 40rem at 12% 18%, var(--aurora-1), transparent 62%),
+    radial-gradient(34rem 34rem at 88% 12%, var(--aurora-2), transparent 62%),
+    radial-gradient(46rem 46rem at 78% 84%, var(--aurora-3), transparent 62%),
+    radial-gradient(30rem 30rem at 22% 92%, var(--aurora-4), transparent 62%);
+}
+
+.scene__photo, .scene__scrim { opacity: 0; }
+.scene__photo { background-position: center; background-size: cover; }
+.scene__scrim { background-color: var(--scrim); }
+
+/* 照片只在選到時才給 url，預設不發這支請求 */
+:root[data-backdrop="photo"] .scene__photo {
+  opacity: 1;
+  background-image: url("https://picsum.photos/seed/glass-toast-backdrop/1800/1200");
+}
+:root[data-backdrop="photo"] .scene__scrim { opacity: 1; }
+:root[data-backdrop="photo"] .scene__aurora,
+:root[data-backdrop="flat"] .scene__aurora { opacity: 0; }
+
+/* --- 版面骨架 --- */
+
+.page { position: relative; z-index: 1; }
+.wrap {
+  width: 100%;
+  max-width: 1160px;
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 4vw, 2.5rem);
+}
+
+/* --- 頂列：控制項一律靠左，把畫面右上角讓給 top-right 容器裡的真通知 --- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  min-height: 64px;
+  padding-block: 1rem;
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-right: 0.25rem;
+  color: inherit;
+  text-decoration: none;
+  font-family: var(--mono);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.brand:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: var(--r-inner); }
+
+.brand__version {
+  padding: 0.05rem 0.5rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-pill);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-faint);
+}
+
+/* --- 站內導覽：與分段控制項同一套外形，目前頁面用 aria-current 標示 --- */
+
+.nav { display: flex; gap: 2px; }
+.nav a {
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--r-inner);
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+.nav a:hover { color: var(--ink); }
+.nav a[aria-current="page"] { background: var(--field-on); color: var(--ink); font-weight: 600; }
+.nav a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* --- 分段控制項（真 radio，方向鍵可切換） --- */
+
+.seg { display: inline-flex; align-items: center; gap: 0.6rem; }
+.seg__label { font-size: 0.8125rem; color: var(--ink-faint); white-space: nowrap; }
+
+.seg__track {
+  display: flex;
+  /* 位置那組的選項字很長，窄視窗要能換行，否則會把整個面板撐破版 */
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  background: var(--field-bg);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-control);
+}
+
+.seg__opt { position: relative; display: flex; }
+.seg__opt input {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  margin: 0; opacity: 0; cursor: pointer;
+}
+
+.seg__opt span {
+  padding: 0.3rem 0.65rem;
+  border-radius: var(--r-inner);
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.seg__opt input:checked + span {
+  background: var(--field-on);
+  color: var(--ink);
+  font-weight: 600;
+}
+.seg__opt input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* --- 按鈕 --- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.15rem;
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 120ms ease;
+}
+
+.btn--primary { background: var(--accent); color: var(--accent-ink); }
+.btn--primary:hover { background: var(--accent-hover); }
+
+.btn--ghost {
+  background: var(--field-bg);
+  border-color: var(--hairline-strong);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.55rem 0.85rem;
+}
+.btn--ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+.btn--mini {
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--r-inner);
+  background: transparent;
+  border-color: var(--hairline-strong);
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+.btn--mini:hover { border-color: var(--accent); color: var(--accent); }
+
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 變體鈕沿用套件的語意色（這是元件資料，不是第二個品牌色） */
+.variant {
+  padding: 0.6rem 0.5rem;
+  border: 1px solid var(--v-border);
+  border-radius: var(--r-control);
+  background: var(--v-bg);
+  color: var(--v-ink);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 120ms ease, filter 160ms ease;
+}
+.variant:hover { filter: brightness(1.04) saturate(1.1); }
+.variant:active { transform: translateY(1px); }
+.variant:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.variant--success { --v-bg: light-dark(#d0fae5, rgba(4, 120, 87, 0.24));  --v-ink: light-dark(#046c4e, #6ee7b7); --v-border: light-dark(rgba(4, 120, 87, 0.28), rgba(110, 231, 183, 0.26)); }
+.variant--error   { --v-bg: light-dark(#ffe2e2, rgba(190, 24, 24, 0.24));  --v-ink: light-dark(#c22323, #fca5a5); --v-border: light-dark(rgba(194, 35, 35, 0.28), rgba(252, 165, 165, 0.26)); }
+.variant--warning { --v-bg: light-dark(#fef3c6, rgba(180, 83, 9, 0.26));   --v-ink: light-dark(#a1490a, #fcd34d); --v-border: light-dark(rgba(161, 73, 10, 0.28), rgba(252, 211, 77, 0.26)); }
+.variant--info    { --v-bg: light-dark(#e2eaf1, rgba(58, 91, 122, 0.30));  --v-ink: light-dark(#33536f, #a8c9e4); --v-border: light-dark(rgba(51, 83, 111, 0.28), rgba(168, 201, 228, 0.26)); }
+
+/* --- 安裝指令（指令 + 複製鈕） --- */
+
+.cmd {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.4rem 0.4rem 0.9rem;
+  background: var(--field-bg);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-control);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  color: var(--ink);
+}
+
+/* --- 區塊 --- */
+
+.section { padding-block: clamp(2.5rem, 6vw, 4rem); }
+.section__head { max-width: 48ch; margin-bottom: clamp(1.5rem, 3vw, 2rem); }
+.section h2 {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.5rem, 2.6vw, 2rem);
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+}
+.section__head p { margin: 0; color: var(--ink-soft); }
+
+.panel {
+  /* grid item 的自動最小尺寸預設是 min-content，程式碼區塊最長那行會把
+     整張面板撐出視窗；歸零後改由 .code 自己橫向捲動 */
+  min-width: 0;
+  padding: clamp(1.25rem, 2.5vw, 1.75rem);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--r-panel);
+  box-shadow: var(--panel-shadow);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  backdrop-filter: blur(20px) saturate(150%);
+}
+
+/* 與套件同樣的後備：沒有 backdrop-filter 就改不透明底 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .panel { background: var(--panel-opaque); }
+}
+
+/* --- 程式碼區塊 --- */
+
+.code__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+.code__title { font-size: 0.8125rem; font-weight: 600; color: var(--ink-soft); }
+
+.code {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  background: var(--code-bg);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-control);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  line-height: 1.75;
+  color: var(--ink);
+  overflow-x: auto;
+  tab-size: 2;
+}
+/* 靜態範例由 site.js 包一層並補上複製鈕；右側留白避免第一行字被鈕蓋住 */
+.code-block { position: relative; }
+.code-block > .code { padding-right: 4.75rem; }
+.code-block__copy { position: absolute; top: 0.55rem; right: 0.55rem; background: var(--field-on); }
+
+.tok-kw  { color: var(--tok-kw); }
+.tok-str { color: var(--tok-str); }
+.tok-fn  { color: var(--tok-fn); }
+.tok-num { color: var(--tok-num); }
+.tok-com { color: var(--tok-com); font-style: italic; }
+
+/* --- 頁尾 --- */
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: clamp(2rem, 5vw, 3rem);
+  padding-block: 2rem 3rem;
+  border-top: 1px solid var(--hairline);
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+.footer__links { display: flex; flex-wrap: wrap; gap: 1.25rem; }
+
+/* --- 進場 ---
+   隱藏初始狀態同時要求兩個前提：使用者未要求減少動態，且 JS 已接手負責
+   補上 is-in（.js-reveal 由 head 腳本掛上）。腳本掛掉時內容維持可見，不會空白 */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* :where() 把前置條件壓成零 specificity，隱藏規則才不會蓋過 .rise.is-in */
+  :where(:root.js-reveal) .rise { opacity: 0; transform: translateY(14px); }
+  .rise.is-in {
+    opacity: 1;
+    transform: none;
+    transition: opacity 620ms cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0ms),
+                transform 620ms cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0ms);
+  }
+}

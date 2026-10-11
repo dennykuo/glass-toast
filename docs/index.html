@@ -1,0 +1,858 @@
+<!doctype html>
+<html lang="zh-Hant" data-backdrop="aurora">
+<head>
+  <!-- partial:head -->
+  <title>文件 · glass-toast</title>
+  <meta name="description" content="%PKG_NAME% 文件：安裝、載入方式、完整 API、行為規則、CSS 變數與深色外觀、CSP / SSR 整合。">
+  <style>
+    /* 文件頁專屬版面；共用 token 與部件見 site.css。
+       內文直接疊在背景場景上（不包玻璃面板）：長頁面整片 backdrop-filter
+       捲動成本高，且 scrim 與照片模式的字色調整已確保可讀 */
+
+    .docs {
+      display: grid;
+      gap: 1.5rem;
+      padding-block: clamp(1.5rem, 4vw, 3rem) 0;
+    }
+    @media (min-width: 960px) {
+      .docs {
+        grid-template-columns: 13.5rem minmax(0, 1fr);
+        gap: clamp(2.5rem, 5vw, 4.5rem);
+        align-items: start;
+      }
+    }
+
+    /* --- 目錄：窄視窗收成 <details>，寬視窗常駐側欄 --- */
+
+    .toc { font-size: 0.875rem; }
+    .toc > summary {
+      padding: 0.6rem 0.9rem;
+      background: var(--field-bg);
+      border: 1px solid var(--hairline);
+      border-radius: var(--r-control);
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .toc > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .toc[open] > summary { margin-bottom: 1rem; }
+
+    @media (min-width: 960px) {
+      .toc {
+        position: sticky;
+        top: 1.5rem;
+        max-height: calc(100dvh - 3rem);
+        overflow-y: auto;
+        padding-bottom: 1rem;
+      }
+      .toc > summary { display: none; }
+    }
+
+    .toc__group + .toc__group { margin-top: 1.25rem; }
+    .toc__title { margin: 0 0 0.35rem 0.7rem; font-size: 0.75rem; font-weight: 600; color: var(--ink-faint); }
+    .toc ul { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; }
+    .toc a {
+      display: block;
+      padding: 0.3rem 0.7rem;
+      border-radius: var(--r-inner);
+      color: var(--ink-soft);
+      text-decoration: none;
+      transition: background-color 160ms ease, color 160ms ease;
+    }
+    .toc a:hover { color: var(--ink); }
+    .toc a[aria-current] { background: var(--field-on); color: var(--ink); font-weight: 600; }
+    .toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* --- 內文 --- */
+
+    .prose { min-width: 0; max-width: 48rem; }
+
+    .docs__head h1 {
+      margin: 0 0 0.75rem;
+      font-size: clamp(2rem, 4vw, 2.75rem);
+      line-height: 1.2;
+      letter-spacing: -0.035em;
+    }
+    .docs__lead {
+      max-width: 38ch;
+      margin: 0 0 1.5rem;
+      font-size: clamp(1rem, 1.5vw, 1.125rem);
+      color: var(--ink-soft);
+    }
+    .docs__head .cmd { display: inline-flex; }
+
+    .group { padding-top: clamp(2.5rem, 6vw, 4rem); }
+    .group > h2 {
+      margin: 0;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--hairline);
+      font-size: clamp(1.5rem, 2.6vw, 1.875rem);
+      line-height: 1.25;
+      letter-spacing: -0.025em;
+    }
+
+    .doc { padding-top: 2.25rem; scroll-margin-top: 1rem; }
+    .doc > * { margin: 0; }
+    .doc > * + * { margin-top: 1rem; }
+    .doc > h3 {
+      font-size: 1.25rem;
+      line-height: 1.35;
+      letter-spacing: -0.015em;
+    }
+    .doc > h3 + * { margin-top: 0.75rem; }
+    .doc > h4 { margin-top: 1.75rem; font-size: 1rem; }
+    .doc > h4 + * { margin-top: 0.6rem; }
+
+    .doc ul, .doc ol { padding-left: 1.25rem; }
+    .doc li + li { margin-top: 0.35rem; }
+
+    /* :where() 把排除條件壓成零權重，標題、表格的覆寫才不用跟它比權重 */
+    .prose :where(:not(pre, .cmd)) > code {
+      padding: 0.1em 0.4em;
+      background: var(--field-bg);
+      border: 1px solid var(--hairline);
+      border-radius: 5px;
+      font-family: var(--mono);
+      font-size: 0.875em;
+      overflow-wrap: anywhere;
+    }
+    .prose h3 code, .prose h4 code { padding: 0; background: none; border: 0; font-size: 0.95em; }
+
+    /* 函式簽名：一行型別摘要，放在標題下 */
+    .sig {
+      font-family: var(--mono);
+      font-size: 0.8125rem;
+      color: var(--ink-soft);
+      overflow-wrap: anywhere;
+    }
+
+    .note {
+      padding: 0.85rem 1rem;
+      background: var(--field-bg);
+      border: 1px solid var(--hairline);
+      border-radius: var(--r-control);
+      font-size: 0.9375rem;
+      color: var(--ink-soft);
+    }
+    .note strong { color: var(--ink); }
+
+    /* --- 表格 --- */
+
+    .table {
+      overflow-x: auto;
+      background: var(--code-bg);
+      border: 1px solid var(--hairline);
+      border-radius: var(--r-control);
+    }
+    /* 窄視窗不把欄位擠到字被拆開，改由外框橫向捲動 */
+    .table table { width: 100%; min-width: 36rem; border-collapse: collapse; font-size: 0.875rem; line-height: 1.55; }
+    .table code { overflow-wrap: normal; }
+    .table th, .table td { padding: 0.6rem 0.9rem; text-align: left; vertical-align: top; }
+    .table thead th {
+      border-bottom: 1px solid var(--hairline);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--ink-faint);
+      white-space: nowrap;
+    }
+    .table tbody tr + tr td { border-top: 1px solid var(--hairline); }
+    .table td:first-child { white-space: nowrap; }
+    .table .muted { display: block; margin-top: 0.15rem; font-size: 0.8125rem; color: var(--ink-soft); white-space: normal; }
+
+    /* CSS 變數的實際值：由腳本讀 getComputedStyle 填入，跟著外觀切換即時更新 */
+    .val { display: flex; align-items: center; gap: 0.5rem; }
+    .val code { white-space: normal; }
+    .swatch {
+      flex-shrink: 0;
+      width: 0.95rem;
+      height: 0.95rem;
+      border: 1px solid var(--hairline-strong);
+      border-radius: 4px;
+    }
+
+    /* --- 試試看：按下就用旁邊那段程式碼送出真通知 --- */
+
+    .try {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.7rem 0.8rem;
+      background: var(--field-bg);
+      border: 1px solid var(--hairline);
+      border-radius: var(--r-control);
+    }
+    .try__label { margin-right: 0.25rem; font-size: 0.8125rem; font-weight: 600; color: var(--ink-soft); }
+    .try .variant { padding: 0.45rem 0.85rem; }
+    .try__hint { flex-basis: 100%; font-size: 0.75rem; color: var(--ink-faint); }
+  </style>
+</head>
+<body>
+  <!-- partial:scene -->
+
+  <div class="page">
+    <!-- partial:topbar -->
+
+    <div class="wrap docs">
+      <!-- 目錄由腳本依內文的 .group / .doc 產生，單一來源；無 JS 時整塊不顯示 -->
+      <details class="toc" id="toc" open hidden>
+        <summary>目錄</summary>
+        <nav aria-label="文件目錄" id="toc-nav"></nav>
+      </details>
+
+      <main class="prose">
+        <header class="docs__head rise">
+          <h1>文件</h1>
+          <p class="docs__lead"><span class="nowrap">從安裝到每個參數。</span><span class="nowrap">標著「試試看」的按鈕，</span><span class="nowrap">會用旁邊那段程式碼送出真的通知。</span></p>
+          <!-- partial:install -->
+        </header>
+
+        <!-- ================================================================ -->
+        <section class="group" aria-labelledby="g-start">
+          <h2 id="g-start">開始使用</h2>
+
+          <section class="doc" id="install">
+            <h3>安裝</h3>
+            <pre class="code" data-lang="sh"><code>npm install %PKG_NAME%</code></pre>
+            <p>套件內含型別宣告，TypeScript 專案不需要另外安裝 <code>@types</code>。沒有建置工具的頁面也可以直接從 CDN 載入，見下方的 <a href="#usage">&lt;script&gt; 引入</a>。</p>
+          </section>
+
+          <section class="doc" id="usage">
+            <h3>載入方式</h3>
+            <p>三種入口差在「要不要掛 <code>window.toast</code>」與「什麼時候注入樣式」，挑一種就好：</p>
+            <div class="table">
+              <table>
+                <thead><tr><th>入口</th><th><code>window.toast</code></th><th>注入樣式</th><th>適合</th></tr></thead>
+                <tbody>
+                  <tr><td><code>/auto</code></td><td>會掛</td><td>import 時</td><td>想在任何地方直接呼叫 <code>toast.success()</code></td></tr>
+                  <tr><td>具名 import</td><td>不掛</td><td>第一次 <code>show()</code> 時</td><td>模組化專案，要 tree-shake</td></tr>
+                  <tr><td><code>&lt;script&gt;</code>（UMD）</td><td><code>register()</code> 後掛</td><td><code>register()</code> 時</td><td>沒有建置工具的頁面</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h4>side-effect 入口（最省事）</h4>
+            <pre class="code" data-lang="js"><code>import '%PKG_NAME%/auto';
+
+// 樣式已注入、window.toast 已掛好
+toast.success('儲存成功');
+toast.error('連線失敗', { position: 'bottom-center' });</code></pre>
+
+            <h4>具名 import（可 tree-shake、不碰 window）</h4>
+            <pre class="code" data-lang="js"><code>import { success, show } from '%PKG_NAME%';
+
+success('儲存成功'); // 第一次呼叫時自動注入樣式
+show('自訂', { type: 'warning', duration: 8000 });</code></pre>
+
+            <h4><code>&lt;script&gt;</code> 引入（UMD，全域 <code>GlassToast</code>）</h4>
+            <pre class="code" data-lang="html"><code>&lt;script src="https://unpkg.com/%PKG_NAME%"&gt;&lt;/script&gt;
+&lt;script&gt;
+  GlassToast.register(); // 掛 window.toast + 注入樣式
+  toast.info('哈囉');
+&lt;/script&gt;</code></pre>
+          </section>
+        </section>
+
+        <!-- ================================================================ -->
+        <section class="group" aria-labelledby="g-api">
+          <h2 id="g-api">API</h2>
+
+          <section class="doc" id="api-show" data-toc="show()">
+            <h3 data-doc="api:show"><code>show(message, options?)</code></h3>
+            <p class="sig">show(message: string, options?: ToastOptions): () =&gt; void</p>
+            <p>顯示一則通知，回傳關閉這則通知的函式。<code>message</code> 一律以 <code>textContent</code> 寫入、不解析 HTML，放什麼字串都安全。</p>
+            <div class="table">
+              <table>
+                <thead><tr><th>選項</th><th>型別</th><th>預設</th><th>說明</th></tr></thead>
+                <tbody>
+                  <tr data-doc="option:type">
+                    <td><code>type</code></td>
+                    <td><code>'success' | 'error' | 'warning' | 'info'</code></td>
+                    <td><code>'info'</code></td>
+                    <td>變體；不認得的值退回 <code>'info'</code></td>
+                  </tr>
+                  <tr data-doc="option:position">
+                    <td><code>position</code></td>
+                    <td><code>'top-right' | 'bottom-right' | 'bottom-center'</code></td>
+                    <td><code>'top-right'</code></td>
+                    <td>顯示位置；不認得的值退回 <code>'top-right'</code></td>
+                  </tr>
+                  <tr data-doc="option:persistent">
+                    <td><code>persistent</code></td>
+                    <td><code>boolean</code></td>
+                    <td><code>false</code></td>
+                    <td><code>true</code> 時不自動消失、不顯示倒數條</td>
+                  </tr>
+                  <tr data-doc="option:duration">
+                    <td><code>duration</code></td>
+                    <td><code>number</code></td>
+                    <td>error <code>10000</code>，其餘 <code>5500</code></td>
+                    <td>自動消失的毫秒數；<code>≤ 0</code> 視為 <code>persistent</code>。規則見<a href="#timing">停留時間</a></td>
+                  </tr>
+                  <tr data-doc="option:action">
+                    <td><code>action</code></td>
+                    <td><code>{ label, onClick }</code></td>
+                    <td>—</td>
+                    <td>內嵌操作按鈕，見 <a href="#action">action 按鈕</a></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <pre class="code" data-lang="js"><code>import { show } from '%PKG_NAME%';
+
+const dismiss = show('匯出完成', { type: 'success', position: 'bottom-right' });
+
+// 需要提早關閉時
+dismiss();</code></pre>
+            <div class="try">
+              <span class="try__label">試試看</span>
+              <button class="btn btn--ghost" type="button" data-demo="show">show(…)</button>
+              <button class="btn btn--ghost" type="button" data-demo="show-dismiss">dismiss()</button>
+            </div>
+          </section>
+
+          <section class="doc" id="api-shortcuts" data-toc="success / error / …">
+            <h3>
+              <code data-doc="api:success">success</code> /
+              <code data-doc="api:error">error</code> /
+              <code data-doc="api:warning">warning</code> /
+              <code data-doc="api:info">info</code>
+            </h3>
+            <p class="sig">success(message: string, options?: Omit&lt;ToastOptions, 'type'&gt;): () =&gt; void</p>
+            <p>等同 <code>show(message, { ...options, type })</code>：簽名與回傳值相同，只是省略 <code>type</code>。</p>
+            <pre class="code" data-lang="js"><code>import { success, error, warning, info } from '%PKG_NAME%';
+
+success('儲存成功');
+error('連線失敗');
+warning('尚有未儲存的變更');
+info('有新版本可用');</code></pre>
+            <div class="try">
+              <span class="try__label">試試看</span>
+              <button class="variant variant--success" type="button" data-demo="variant" data-type="success">success</button>
+              <button class="variant variant--error" type="button" data-demo="variant" data-type="error">error</button>
+              <button class="variant variant--warning" type="button" data-demo="variant" data-type="warning">warning</button>
+              <button class="variant variant--info" type="button" data-demo="variant" data-type="info">info</button>
+            </div>
+          </section>
+
+          <section class="doc" id="action" data-toc="action 按鈕">
+            <h3><code>action</code> 按鈕</h3>
+            <p>傳入 <code>action: { label, onClick }</code> 會在訊息與關閉鈕之間放一顆按鈕；點擊後先執行 <code>onClick</code>，再關閉這則通知。<code>label</code> 同樣以 <code>textContent</code> 寫入。</p>
+            <p>沒有明確給 <code>duration</code> 時，帶 action 的通知<strong>預設不自動消失</strong>：需要使用者做決定的訊息，不該在對方讀完之前就不見。仍想自動消失，就明確指定 <code>duration</code>。</p>
+            <pre class="code" data-lang="js"><code>import { error } from '%PKG_NAME%';
+
+error('上傳失敗，是否重試？', {
+  action: { label: '重試', onClick: () =&gt; retryUpload() },
+});</code></pre>
+            <div class="try">
+              <span class="try__label">試試看</span>
+              <button class="btn btn--ghost" type="button" data-demo="action">error(…, { action })</button>
+            </div>
+          </section>
+
+          <section class="doc" id="api-dismissAll" data-toc="dismissAll() / resume()">
+            <h3><code data-doc="api:dismissAll">dismissAll(options?)</code> / <code data-doc="api:resume">resume()</code></h3>
+            <p class="sig">dismissAll(options?: { suppress?: boolean }): void</p>
+            <p><code>dismissAll()</code> 立即清空所有位置的通知（不播退場動畫）。預設只清空，不影響之後的 <code>show()</code>。</p>
+            <div class="table">
+              <table>
+                <thead><tr><th>選項</th><th>型別</th><th>預設</th><th>說明</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td><code>suppress</code></td>
+                    <td><code>boolean</code></td>
+                    <td><code>false</code></td>
+                    <td><code>true</code> 時同時鎖住後續 <code>show()</code>（直接回傳空函式、不顯示），直到呼叫 <code>resume()</code> 或整頁重載</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p><code>suppress</code> 是給「session 過期 → 硬導航到登入頁」這類情境用的：redirect 與頁面卸載之間，還在飛的請求可能失敗並觸發新通知，先鎖住就不會閃現。SPA 不重載頁面時，記得用 <code>resume()</code> 解鎖。</p>
+            <pre class="code" data-lang="js"><code>import { dismissAll, resume } from '%PKG_NAME%';
+
+// 只清空，之後的 show() 照常顯示
+dismissAll();
+
+// session 過期：清空並鎖住，再硬導航
+dismissAll({ suppress: true });
+location.assign('/login');
+
+// SPA 不重載的情境，手動解鎖
+resume();</code></pre>
+            <div class="try">
+              <span class="try__label">試試看</span>
+              <button class="btn btn--ghost" type="button" data-demo="burst">送出四則</button>
+              <button class="btn btn--ghost" type="button" data-demo="dismiss-all">dismissAll()</button>
+              <button class="btn btn--ghost" type="button" data-demo="suppress">dismissAll({ suppress: true })</button>
+              <button class="btn btn--ghost" type="button" data-demo="resume">resume()</button>
+              <span class="try__hint">按過 suppress 後，這頁其他按鈕都不會出現通知，直到按 resume()。</span>
+            </div>
+          </section>
+
+          <section class="doc" id="api-register" data-toc="register()">
+            <h3 data-doc="api:register"><code>register(options?)</code></h3>
+            <p class="sig">register(options?: { global?: boolean; injectStyles?: boolean; target?: object }): ToastApi</p>
+            <p>把 API 掛到全域並注入樣式。<code>/auto</code> 入口就是不帶參數呼叫它；只用具名 import 的專案不需要呼叫。</p>
+            <div class="table">
+              <table>
+                <thead><tr><th>選項</th><th>型別</th><th>預設</th><th>說明</th></tr></thead>
+                <tbody>
+                  <tr data-doc="register:global">
+                    <td><code>global</code></td>
+                    <td><code>boolean</code></td>
+                    <td><code>true</code></td>
+                    <td>是否把 API 掛到 <code>target.toast</code></td>
+                  </tr>
+                  <tr data-doc="register:injectStyles">
+                    <td><code>injectStyles</code></td>
+                    <td><code>boolean</code></td>
+                    <td><code>true</code></td>
+                    <td><code>false</code> 時全面停用自動注入，之後的 <code>show()</code> 也不會補注入；搭配自行載入 <code>style.css</code>，見<a href="#csp">嚴格 CSP</a></td>
+                  </tr>
+                  <tr data-doc="register:target">
+                    <td><code>target</code></td>
+                    <td><code>object</code></td>
+                    <td><code>window</code></td>
+                    <td>全域掛載的對象</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p>回傳值與 <code>window.toast</code> 是同一個物件，包含 <code>show</code>、<code>success</code>、<code>error</code>、<code>warning</code>、<code>info</code>、<code>dismissAll</code>、<code>resume</code>。</p>
+            <pre class="code" data-lang="js"><code>import { register } from '%PKG_NAME%';
+
+// 不碰 window，直接用回傳的物件
+const toast = register({ global: false });
+toast.info('哈囉');</code></pre>
+          </section>
+
+          <section class="doc" id="api-ensureStyles" data-toc="ensureStyles()">
+            <h3 data-doc="api:ensureStyles"><code>ensureStyles()</code></h3>
+            <p class="sig">ensureStyles(): void</p>
+            <p>把樣式以 <code>&lt;style data-glass-toast&gt;</code> 注入 <code>&lt;head&gt;</code> 最前面，重複呼叫不會重複注入。插在最前面是為了讓你的樣式表排在後面，覆蓋 <code>--gt-*</code> 變數時自然勝出。</p>
+            <ul>
+              <li>頁面上已有帶 <code>data-glass-toast</code> 屬性的 <code>&lt;style&gt;</code> 或 <code>&lt;link&gt;</code> 時直接跳過。</li>
+              <li>沒有 <code>document</code>（SSR）時什麼都不做。</li>
+              <li>通常不需要手動呼叫：自動注入開啟時，每次 <code>show()</code> 都會順手檢查一次。用 <code>register({ injectStyles: false })</code> 關掉自動注入後，想自己決定注入時機才需要它。</li>
+            </ul>
+          </section>
+        </section>
+
+        <!-- ================================================================ -->
+        <section class="group" aria-labelledby="g-behavior">
+          <h2 id="g-behavior">行為</h2>
+
+          <section class="doc" id="timing">
+            <h3>停留時間</h3>
+            <p>error 預設停留 10 秒（錯誤訊息通常較長，也需要時間判斷怎麼處理），其他變體 5.5 秒。底部的倒數條會隨時間縮短，指示剩餘時間。</p>
+            <div class="table">
+              <table>
+                <thead><tr><th>呼叫</th><th>結果</th></tr></thead>
+                <tbody>
+                  <tr><td><code>info('…')</code></td><td>5.5 秒後消失</td></tr>
+                  <tr><td><code>error('…')</code></td><td>10 秒後消失</td></tr>
+                  <tr><td><code>info('…', { duration: 2000 })</code></td><td>2 秒後消失</td></tr>
+                  <tr><td><code>info('…', { persistent: true })</code></td><td>不自動消失，沒有倒數條</td></tr>
+                  <tr><td><code>info('…', { duration: 0 })</code></td><td>同 <code>persistent: true</code></td></tr>
+                  <tr><td><code>error('…', { action })</code></td><td>同 <code>persistent: true</code>（帶 action 且沒給 duration）</td></tr>
+                  <tr><td><code>error('…', { action, duration: 8000 })</code></td><td>8 秒後消失</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="try">
+              <span class="try__label">試試看</span>
+              <button class="btn btn--ghost" type="button" data-demo="duration">duration: 2000</button>
+              <button class="btn btn--ghost" type="button" data-demo="persistent">persistent: true</button>
+            </div>
+          </section>
+
+          <section class="doc" id="stacking">
+            <h3>位置與堆疊</h3>
+            <ul>
+              <li>三個位置各有獨立的容器，第一次用到才建立，清空後自動移除。</li>
+              <li>新通知排在同一位置既有通知的後面。</li>
+              <li>同一位置最多同時顯示 4 則；第 5 則進來時，最舊的一則會自動關閉。</li>
+              <li>關閉時高度平滑收合，其餘通知跟著補位，不會跳動。</li>
+              <li>容器的 <code>z-index</code> 是 <code>2147483647</code>，不會被頁面上的 modal 或 overlay 蓋住。</li>
+            </ul>
+            <div class="try">
+              <span class="try__label">試試看</span>
+              <button class="btn btn--ghost" type="button" data-demo="position" data-position="top-right">top-right</button>
+              <button class="btn btn--ghost" type="button" data-demo="position" data-position="bottom-right">bottom-right</button>
+              <button class="btn btn--ghost" type="button" data-demo="position" data-position="bottom-center">bottom-center</button>
+              <button class="btn btn--ghost" type="button" data-demo="cap">連送 6 則</button>
+              <span class="try__hint">「連送 6 則」會送到 bottom-right，畫面上最多只留 4 則。</span>
+            </div>
+          </section>
+
+          <section class="doc" id="a11y">
+            <h3>無障礙</h3>
+            <div class="table">
+              <table>
+                <thead><tr><th>變體</th><th><code>role</code></th><th><code>aria-live</code></th></tr></thead>
+                <tbody>
+                  <tr><td><code>error</code></td><td><code>alert</code></td><td><code>assertive</code>：立即打斷朗讀</td></tr>
+                  <tr><td><code>success</code> / <code>warning</code> / <code>info</code></td><td><code>status</code></td><td><code>polite</code>：等目前朗讀結束</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <ul>
+              <li>滑鼠移上或鍵盤焦點進入時暫停倒數（倒數條同步停住），兩者都離開才恢復，符合 WCAG 2.2.1。</li>
+              <li>焦點在通知內時按 <kbd>Esc</kbd> 關閉該則；不攔截頁面其他地方的 <kbd>Esc</kbd>。</li>
+              <li>通知關閉時若焦點還在裡面，焦點會交還給觸發它的元素；觸發者已不在頁面上時，移到其他通知的關閉鈕，不會掉回頁首。</li>
+              <li>圖示為 <code>aria-hidden</code>，與藥丸底的對比至少 3:1。關閉鈕的 <code>aria-label</code> 目前固定為「關閉通知」。</li>
+            </ul>
+          </section>
+
+          <section class="doc" id="fallback">
+            <h3>降級</h3>
+            <ul>
+              <li><code>prefers-reduced-motion: reduce</code>：改為純淡入淡出，沒有位移與 glow 脈衝；倒數條保留，因為它傳達的是剩餘時間，不是裝飾。</li>
+              <li>不支援 <code>backdrop-filter</code> 的瀏覽器：外殼改用 <code>--gt-bg-opaque</code> 不透明底，維持可讀。</li>
+              <li>極長的訊息最多顯示 5 行，超出以省略號截斷；不含空白的長字串會強制換行。</li>
+            </ul>
+            <p>你的瀏覽器目前套用哪些降級，可以在 <a href="./demo.html#env">Demo 頁</a>即時看到。</p>
+          </section>
+
+          <section class="doc" id="spa">
+            <h3>SPA 換頁</h3>
+            <p>容器或注入的 <code>&lt;style&gt;</code> 被換頁流程拿掉時（例如 Astro ViewTransitions 替換整個 <code>&lt;body&gt;</code>），下一次 <code>show()</code> 會自動重建，不需要額外處理。樣式注入在 <code>&lt;head&gt;</code> 而非 <code>&lt;body&gt;</code>，本來就避開了 body 替換。</p>
+            <p>換頁時想順便清掉舊通知，在路由事件裡呼叫 <code>dismissAll()</code>：</p>
+            <pre class="code" data-lang="js"><code>import { dismissAll } from '%PKG_NAME%';
+
+// Astro ViewTransitions
+document.addEventListener('astro:before-swap', () =&gt; dismissAll());</code></pre>
+          </section>
+        </section>
+
+        <!-- ================================================================ -->
+        <section class="group" aria-labelledby="g-style">
+          <h2 id="g-style">樣式</h2>
+
+          <section class="doc" id="theming" data-toc="CSS 變數">
+            <h3>CSS 變數</h3>
+            <p>所有顏色與外觀都走 <code>--gt-*</code> 自訂屬性，範圍限定在 <code>.glass-toast</code> 上，不污染 <code>:root</code>。在你的樣式表覆蓋即可，不需要拉高權重：</p>
+            <pre class="code" data-lang="css"><code>.glass-toast {
+  --gt-radius: 0.5rem;
+  --gt-text: #333;
+}
+
+.glass-toast--success {
+  --gt-icon: #0a7d4f;
+  --gt-ring: 10, 125, 79;
+}</code></pre>
+            <p class="note">表格右欄是這個頁面<strong>目前外觀下的實際值</strong>，切換頂列的「外觀」會即時更新。</p>
+
+            <h4>外殼</h4>
+            <div class="table">
+              <table>
+                <thead><tr><th>變數</th><th>用途</th><th>目前值</th></tr></thead>
+                <tbody>
+                  <tr data-doc="var:--gt-bg"><td><code>--gt-bg</code></td><td>外殼底色，半透明以透出背後的模糊</td><td data-var-value="--gt-bg">—</td></tr>
+                  <tr data-doc="var:--gt-bg-opaque"><td><code>--gt-bg-opaque</code></td><td>不支援 <code>backdrop-filter</code> 時改用的底色</td><td data-var-value="--gt-bg-opaque">—</td></tr>
+                  <tr data-doc="var:--gt-border"><td><code>--gt-border</code></td><td>外殼邊線</td><td data-var-value="--gt-border">—</td></tr>
+                  <tr data-doc="var:--gt-text"><td><code>--gt-text</code></td><td>訊息文字</td><td data-var-value="--gt-text">—</td></tr>
+                  <tr data-doc="var:--gt-blur"><td><code>--gt-blur</code></td><td>毛玻璃模糊半徑</td><td data-var-value="--gt-blur">—</td></tr>
+                  <tr data-doc="var:--gt-radius"><td><code>--gt-radius</code></td><td>外殼圓角</td><td data-var-value="--gt-radius">—</td></tr>
+                  <tr data-doc="var:--gt-shadow"><td><code>--gt-shadow</code></td><td>外殼陰影；進場 glow 疊在它上面</td><td data-var-value="--gt-shadow">—</td></tr>
+                  <tr data-doc="var:--gt-focus-ring"><td><code>--gt-focus-ring</code></td><td>關閉鈕與 action 鈕的 focus 外框</td><td data-var-value="--gt-focus-ring">—</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h4>關閉鈕</h4>
+            <div class="table">
+              <table>
+                <thead><tr><th>變數</th><th>用途</th><th>目前值</th></tr></thead>
+                <tbody>
+                  <tr data-doc="var:--gt-close-bg"><td><code>--gt-close-bg</code></td><td>底色</td><td data-var-value="--gt-close-bg">—</td></tr>
+                  <tr data-doc="var:--gt-close-border"><td><code>--gt-close-border</code></td><td>邊線</td><td data-var-value="--gt-close-border">—</td></tr>
+                  <tr data-doc="var:--gt-close-text"><td><code>--gt-close-text</code></td><td>圖示色</td><td data-var-value="--gt-close-text">—</td></tr>
+                  <tr data-doc="var:--gt-close-bg-hover"><td><code>--gt-close-bg-hover</code></td><td>hover 底色</td><td data-var-value="--gt-close-bg-hover">—</td></tr>
+                  <tr data-doc="var:--gt-close-border-hover"><td><code>--gt-close-border-hover</code></td><td>hover 邊線</td><td data-var-value="--gt-close-border-hover">—</td></tr>
+                  <tr data-doc="var:--gt-close-text-hover"><td><code>--gt-close-text-hover</code></td><td>hover 圖示色</td><td data-var-value="--gt-close-text-hover">—</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h4>action 鈕</h4>
+            <p>這組沒有預設值，未設定時沿用右欄的變數，所以 action 鈕會自動跟著變體換色。</p>
+            <div class="table">
+              <table>
+                <thead><tr><th>變數</th><th>用途</th><th>未設定時</th></tr></thead>
+                <tbody>
+                  <tr data-doc="var:--gt-action-bg"><td><code>--gt-action-bg</code></td><td>底色</td><td><code>transparent</code></td></tr>
+                  <tr data-doc="var:--gt-action-border"><td><code>--gt-action-border</code></td><td>邊線</td><td><code>var(--gt-border)</code></td></tr>
+                  <tr data-doc="var:--gt-action-text"><td><code>--gt-action-text</code></td><td>文字</td><td><code>var(--gt-icon)</code></td></tr>
+                  <tr data-doc="var:--gt-action-bg-hover"><td><code>--gt-action-bg-hover</code></td><td>hover 底色</td><td><code>var(--gt-pill-bg)</code></td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h4>變體</h4>
+            <p>設在 <code>.glass-toast--success</code> 等變體 class 上。深色外觀沿用同一組值。</p>
+            <div class="table">
+              <table>
+                <thead><tr><th>變數</th><th>success</th><th>error</th><th>warning</th><th>info</th></tr></thead>
+                <tbody>
+                  <tr data-doc="var:--gt-pill-bg">
+                    <td><code>--gt-pill-bg</code><span class="muted">圖示藥丸底</span></td>
+                    <td data-var-value="--gt-pill-bg" data-variant="success">—</td>
+                    <td data-var-value="--gt-pill-bg" data-variant="error">—</td>
+                    <td data-var-value="--gt-pill-bg" data-variant="warning">—</td>
+                    <td data-var-value="--gt-pill-bg" data-variant="info">—</td>
+                  </tr>
+                  <tr data-doc="var:--gt-icon">
+                    <td><code>--gt-icon</code><span class="muted">圖示色，也是 action 鈕預設文字色</span></td>
+                    <td data-var-value="--gt-icon" data-variant="success">—</td>
+                    <td data-var-value="--gt-icon" data-variant="error">—</td>
+                    <td data-var-value="--gt-icon" data-variant="warning">—</td>
+                    <td data-var-value="--gt-icon" data-variant="info">—</td>
+                  </tr>
+                  <tr data-doc="var:--gt-bar">
+                    <td><code>--gt-bar</code><span class="muted">倒數條</span></td>
+                    <td data-var-value="--gt-bar" data-variant="success">—</td>
+                    <td data-var-value="--gt-bar" data-variant="error">—</td>
+                    <td data-var-value="--gt-bar" data-variant="warning">—</td>
+                    <td data-var-value="--gt-bar" data-variant="info">—</td>
+                  </tr>
+                  <tr data-doc="var:--gt-ring">
+                    <td><code>--gt-ring</code><span class="muted">進場 glow 顏色，寫成 <code>R, G, B</code> 三個數字</span></td>
+                    <td data-var-value="--gt-ring" data-variant="success">—</td>
+                    <td data-var-value="--gt-ring" data-variant="error">—</td>
+                    <td data-var-value="--gt-ring" data-variant="warning">—</td>
+                    <td data-var-value="--gt-ring" data-variant="info">—</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="doc" id="dark">
+            <h3>深色外觀</h3>
+            <p>深色是「深色毛玻璃」：低亮度半透明底配淺字，保留玻璃質感、避免夜間刺眼。只覆寫外殼、關閉鈕與 focus 外框的變數，變體色沿用淺色那組。下列任一條件成立就會套用：</p>
+            <ol>
+              <li>系統偏好深色（<code>prefers-color-scheme: dark</code>）；但頁面明確標示 <code>data-theme="light"</code> 或 <code>.light</code> 時讓路</li>
+              <li><code>&lt;html data-theme="dark"&gt;</code></li>
+              <li><code>&lt;html class="dark"&gt;</code>（Tailwind 慣例）</li>
+            </ol>
+            <p>深色規則用 <code>:where()</code> 壓到與預設相同的權重，你的覆蓋規則照常勝出。只想改深色時的值：</p>
+            <pre class="code" data-lang="css"><code>[data-theme="dark"] .glass-toast {
+  --gt-bg: rgba(15, 23, 42, 0.75);
+}</code></pre>
+            <div class="try">
+              <span class="try__label">試試看</span>
+              <button class="btn btn--ghost" type="button" data-demo="variant" data-type="info">info(…)</button>
+              <span class="try__hint">先切換頂列的「外觀」，再按一次比較。</span>
+            </div>
+          </section>
+        </section>
+
+        <!-- ================================================================ -->
+        <section class="group" aria-labelledby="g-integrate">
+          <h2 id="g-integrate">整合</h2>
+
+          <section class="doc" id="csp" data-toc="嚴格 CSP">
+            <h3>嚴格 CSP</h3>
+            <p>自動注入會插入一段 inline <code>&lt;style&gt;</code>，<code>style-src</code> 不允許 <code>'unsafe-inline'</code> 時會被擋下。改成自行載入樣式檔，並關掉自動注入：</p>
+            <pre class="code" data-lang="js"><code>import '%PKG_NAME%/style.css';
+import { register, success } from '%PKG_NAME%';
+
+register({ global: false, injectStyles: false });
+success('儲存成功');</code></pre>
+            <p>如果樣式是用自己的 <code>&lt;link&gt;</code> 或 <code>&lt;style&gt;</code> 載入，加上 <code>data-glass-toast</code> 屬性，自動注入就會偵測到並跳過：</p>
+            <pre class="code" data-lang="html"><code>&lt;link rel="stylesheet" href="/vendor/glass-toast.css" data-glass-toast&gt;</code></pre>
+          </section>
+
+          <section class="doc" id="ssr">
+            <h3>SSR</h3>
+            <p>所有入口在沒有 <code>document</code> 的環境 import 都是安全的：<code>/auto</code>、<code>register()</code>、<code>ensureStyles()</code> 不會做任何事。<code>show()</code> 需要 DOM，請只在 client 端呼叫，例如事件處理器、<code>useEffect</code> 或 <code>onMounted</code> 裡。</p>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <!-- partial:footer -->
+  </div>
+
+  <script type="module">
+    import { toast, onAppearanceChange } from './site.js';
+    import { activeIndex } from './scrollspy.js';
+
+    // --- 試試看：每個按鈕對應旁邊那段範例程式碼 ---
+
+    const SAMPLE = {
+      success: '儲存成功',
+      error: '連線失敗',
+      warning: '尚有未儲存的變更',
+      info: '有新版本可用',
+    };
+
+    let lastDismiss = null;
+
+    const DEMOS = {
+      show: () => {
+        lastDismiss = toast.show('匯出完成', { type: 'success', position: 'bottom-right' });
+      },
+      'show-dismiss': () => lastDismiss?.(),
+      variant: (btn) => toast[btn.dataset.type](SAMPLE[btn.dataset.type]),
+      action: () => toast.error('上傳失敗，是否重試？', {
+        action: { label: '重試', onClick: () => toast.success('已重新上傳') },
+      }),
+      burst: () => {
+        for (const type of Object.keys(SAMPLE)) toast[type](SAMPLE[type]);
+      },
+      'dismiss-all': () => toast.dismissAll(),
+      suppress: () => toast.dismissAll({ suppress: true }),
+      resume: () => {
+        toast.resume();
+        toast.info('已解鎖，show() 恢復作用');
+      },
+      duration: () => toast.info('2 秒後消失', { duration: 2000 }),
+      persistent: () => toast.info('不會自動消失，按右側關閉', { persistent: true }),
+      position: (btn) => toast.info(btn.dataset.position, { position: btn.dataset.position }),
+      cap: () => {
+        for (let i = 1; i <= 6; i += 1) toast.info(`第 ${i} 則`, { position: 'bottom-right' });
+      },
+    };
+
+    document.querySelectorAll('[data-demo]').forEach((btn) => {
+      btn.addEventListener('click', () => DEMOS[btn.dataset.demo](btn));
+    });
+
+    // --- CSS 變數實際值：讀隱藏探針元素的 computed style，跟著外觀即時更新 ---
+
+    const probes = { base: document.createElement('div') };
+    probes.base.className = 'glass-toast';
+    for (const type of Object.keys(SAMPLE)) {
+      probes[type] = document.createElement('div');
+      probes[type].className = `glass-toast glass-toast--${type}`;
+    }
+    const probeRoot = document.createElement('div');
+    probeRoot.hidden = true;
+    probeRoot.append(...Object.values(probes));
+    document.body.append(probeRoot);
+
+    const isColor = (value) => /^(#|rgba?\(|hsla?\(|oklch\(|color\()/.test(value);
+
+    function renderVars() {
+      document.querySelectorAll('[data-var-value]').forEach((cell) => {
+        const name = cell.dataset.varValue;
+        const probe = probes[cell.dataset.variant ?? 'base'];
+        let value = getComputedStyle(probe).getPropertyValue(name).trim();
+        const isRing = name === '--gt-ring';
+        if (isRing) value = value.replace(/\s*,\s*/g, ', ');
+
+        const wrap = document.createElement('span');
+        wrap.className = 'val';
+        if (isRing || isColor(value)) {
+          const swatch = document.createElement('span');
+          swatch.className = 'swatch';
+          swatch.style.background = isRing ? `rgb(${value})` : value;
+          wrap.append(swatch);
+        }
+        const code = document.createElement('code');
+        code.textContent = value || '—';
+        wrap.append(code);
+        cell.replaceChildren(wrap);
+      });
+    }
+
+    renderVars();
+    onAppearanceChange(renderVars);
+
+    // --- 目錄：依內文的 .group / .doc 產生，標題改了目錄自動跟上 ---
+
+    const toc = document.getElementById('toc');
+    const tocNav = document.getElementById('toc-nav');
+    const tocLinks = new Map();
+
+    for (const group of document.querySelectorAll('.prose .group')) {
+      const block = document.createElement('div');
+      block.className = 'toc__group';
+
+      const title = document.createElement('p');
+      title.className = 'toc__title';
+      title.textContent = group.querySelector('h2').textContent;
+
+      const list = document.createElement('ul');
+      for (const doc of group.querySelectorAll('.doc[id]')) {
+        const a = document.createElement('a');
+        a.href = `#${doc.id}`;
+        a.textContent = doc.dataset.toc ?? doc.querySelector('h3').textContent.trim();
+        const li = document.createElement('li');
+        li.append(a);
+        list.append(li);
+        tocLinks.set(doc.id, a);
+      }
+
+      block.append(title, list);
+      tocNav.append(block);
+    }
+    toc.hidden = false;
+
+    // 寬視窗常駐展開；窄視窗預設收合，點了連結就收起來讓出畫面
+    const mqWide = window.matchMedia('(min-width: 960px)');
+    const syncToc = () => { toc.open = mqWide.matches; };
+    syncToc();
+    mqWide.addEventListener('change', syncToc);
+    tocNav.addEventListener('click', (e) => {
+      if (e.target.closest('a') && !mqWide.matches) toc.open = false;
+    });
+
+    // --- 捲動同步：判斷規則見 scrollspy.js ---
+
+    const SPY_BASELINE = 0.15; // 判定線平時位置：視窗高度的比例
+    const sections = [...document.querySelectorAll('.prose .doc[id]')];
+    let current = null;
+
+    // 點連結跳到某一節時先釘住它：頁尾的節捲不到可以「越過判定線」的位置，
+    // 不釘的話點了也亮不起來。使用者自己動手捲動（滾輪、觸控、按鍵、拖捲軸）就解除
+    let pinned = location.hash ? tocLinks.get(location.hash.slice(1)) ?? null : null;
+
+    function setCurrent(link) {
+      if (link === current) return;
+      current?.removeAttribute('aria-current');
+      link?.setAttribute('aria-current', 'location');
+      current = link;
+    }
+
+    function syncCurrent() {
+      if (pinned) {
+        setCurrent(pinned);
+        return;
+      }
+      const index = activeIndex(sections.map((el) => el.getBoundingClientRect().top), {
+        viewportHeight: innerHeight,
+        baseLine: innerHeight * SPY_BASELINE,
+        scrollY,
+        maxScroll: document.documentElement.scrollHeight - innerHeight,
+      });
+      setCurrent(index < 0 ? null : tocLinks.get(sections[index].id));
+    }
+
+    // 目錄與內文裡的 #錨點 都算；pointerdown / keydown 先解除、click 再釘住，順序剛好。
+    // 釘住後立刻更新：已經捲到底時再點頁尾的另一節，頁面不會動、不會有 scroll 事件
+    document.addEventListener('click', (e) => {
+      const id = e.target.closest('a[href^="#"]')?.getAttribute('href').slice(1);
+      if (!tocLinks.has(id)) return;
+      pinned = tocLinks.get(id);
+      setCurrent(pinned);
+    });
+    for (const type of ['wheel', 'touchstart', 'keydown', 'pointerdown']) {
+      addEventListener(type, () => { pinned = null; }, { passive: true });
+    }
+
+    let ticking = false;
+    addEventListener('scroll', () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        ticking = false;
+        syncCurrent();
+      });
+    }, { passive: true });
+    addEventListener('resize', syncCurrent);
+    syncCurrent();
+  </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://picsum.photos">
+<link rel="stylesheet" href="./site.css">
+<script>
+  // 首次繪製前就決定要不要跑進場動畫：沒有 IntersectionObserver 就不藏，
+  // 內容一律直接顯示。放在 head 是為了避免「先顯示再被藏起來」的閃爍。
+  if ('IntersectionObserver' in window) document.documentElement.classList.add('js-reveal');
+</script>
