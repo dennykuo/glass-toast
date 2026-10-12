@@ -45,6 +45,9 @@ const MAX_VISIBLE_PER_POSITION = 4;
 const DEFAULT_TYPE = 'info';
 const DEFAULT_POSITION = 'top-right';
 
+// 關閉按鈕的無障礙名稱；非英語介面用 register({ closeLabel }) 換成在地語言
+const DEFAULT_CLOSE_LABEL = 'Close';
+
 // role + aria-live 等級 + glow ring RGB 後備值：
 //   role="alert"（隱含 assertive）僅給 error；其餘用 role="status"（隱含 polite），
 //   避免 role 與 aria-live 語意衝突。
@@ -70,6 +73,7 @@ const TOAST_BASE_SHADOW = '0 4px 24px -4px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,
 // --- 樣式注入 ---
 
 let autoInjectStyles = true;
+let closeLabel = DEFAULT_CLOSE_LABEL;
 
 /**
  * 確保套件樣式已載入（冪等；SSR 無 document 時 no-op）。
@@ -181,7 +185,7 @@ function createToastEl(message, { type, position, persistent, duration, action }
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'glass-toast__close';
-  btn.setAttribute('aria-label', '關閉通知');
+  btn.setAttribute('aria-label', closeLabel);
   btn.innerHTML = ICONS.close;
   el.appendChild(btn);
 
@@ -453,10 +457,13 @@ const api = { show, success, error, warning, info, dismissAll, resume };
  * @param {boolean} [options.global=true] 是否掛 target.toast
  * @param {boolean} [options.injectStyles=true] false 時全面停用自動樣式注入（CSP / 顯式 import style.css 場景）
  * @param {Object} [options.target=window] 全域掛載目標
+ * @param {string} [options.closeLabel='Close'] 關閉按鈕的 aria-label，套用到之後顯示的 toast；
+ *   空字串或非字串時退回預設，避免產生沒有名稱的按鈕
  * @returns {ToastApi}
  */
-export function register({ global = true, injectStyles = true, target } = {}) {
+export function register({ global = true, injectStyles = true, target, closeLabel: label } = {}) {
   autoInjectStyles = injectStyles;
+  closeLabel = typeof label === 'string' && label.trim() ? label : DEFAULT_CLOSE_LABEL;
   if (injectStyles) ensureStyles();
   if (global) {
     const t = target ?? (typeof window !== 'undefined' ? window : undefined);

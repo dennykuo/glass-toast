@@ -2,7 +2,8 @@
 // import 即生效；各頁只處理自己的互動。
 import { register } from '../src/index.js';
 
-export const toast = register(); // 樣式自動注入 + window.toast
+// 樣式自動注入 + window.toast；站台是中文介面，關閉鈕的無障礙名稱跟著用中文
+export const toast = register({ closeLabel: '關閉通知' });
 
 const html = document.documentElement;
 const mqDark = window.matchMedia('(prefers-color-scheme: dark)');

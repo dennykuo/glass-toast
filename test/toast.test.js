@@ -254,7 +254,7 @@ describe('close button', () => {
     const { show } = await loadToast();
     show('close me', { persistent: true });
 
-    const btn = document.querySelector('[aria-label="關閉通知"]');
+    const btn = document.querySelector('.glass-toast__close');
     btn.click();
     vi.advanceTimersByTime(500);
 
@@ -369,7 +369,23 @@ describe('accessibility', () => {
 
     const btn = document.querySelector('.glass-toast__close');
     expect(btn.tagName).toBe('BUTTON');
-    expect(btn.getAttribute('aria-label')).toBe('關閉通知');
+    expect(btn.getAttribute('aria-label')).toBe('Close');
+  });
+
+  it('register({ closeLabel }) 自訂關閉按鈕的 aria-label，套用到之後的 toast', async () => {
+    const { register, show } = await loadToast();
+    register({ global: false, closeLabel: '關閉通知' });
+    show('a11y', { persistent: true });
+
+    expect(document.querySelector('.glass-toast__close').getAttribute('aria-label')).toBe('關閉通知');
+  });
+
+  it.each([[''], ['   '], [42], [null]])('closeLabel 為 %j 時退回預設，不產生空的 aria-label', async (closeLabel) => {
+    const { register, show } = await loadToast();
+    register({ global: false, closeLabel });
+    show('a11y', { persistent: true });
+
+    expect(document.querySelector('.glass-toast__close').getAttribute('aria-label')).toBe('Close');
   });
 
   it('reduced motion 時不加位移隱藏態，改純淡入', async () => {

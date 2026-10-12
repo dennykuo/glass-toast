@@ -8,7 +8,7 @@
 - hover **與鍵盤焦點**皆暫停自動消失（含進度條同步暫停）；`Esc` 關閉聚焦中的 toast、關閉後焦點交還觸發者（WCAG 2.2.1）
 - 內建 dark 外觀（**深色毛玻璃 + 淺字**，保留玻璃身分、避免夜間眩光），自動命中 `prefers-color-scheme` / `[data-theme="dark"]` / `.dark` 三種慣例
 - `prefers-reduced-motion` 完整降級（純淡入、無位移、無 glow；倒數進度條保留，仍提供時間指示）
-- a11y：`role="status"`（一般）/ `role="alert"`（error）+ 對應 `aria-live`（error 為 assertive，其餘 polite），圖示對藥丸底達 ≥3:1 對比
+- a11y：`role="status"`（一般）/ `role="alert"`（error）+ 對應 `aria-live`（error 為 assertive，其餘 polite），圖示對藥丸底達 ≥3:1 對比；關閉按鈕名稱可用 `closeLabel` 在地化
 - 內嵌 `action` 按鈕（如「重試」）；error 未指定時停留較久（10s），同位置最多同時 4 則、超量自動收合最舊
 - SPA 友善：容器與樣式在 body/head 被替換後自動重建（Astro ViewTransitions 實測）
 
@@ -102,6 +102,7 @@ resume();                       // SPA 不重載時手動解鎖
 | `global` | `true` | 掛 `target.toast` |
 | `injectStyles` | `true` | `false` 時全面停用自動樣式注入 |
 | `target` | `window` | 全域掛載目標 |
+| `closeLabel` | `'Close'` | 關閉按鈕的 `aria-label`；非英語介面請換成在地語言，例如 `register({ closeLabel: '關閉通知' })` |
 
 ### `ensureStyles()`
 

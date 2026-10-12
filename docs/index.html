@@ -390,8 +390,8 @@ resume();</code></pre>
 
           <section class="doc" id="api-register" data-toc="register()">
             <h3 data-doc="api:register"><code>register(options?)</code></h3>
-            <p class="sig">register(options?: { global?: boolean; injectStyles?: boolean; target?: object }): ToastApi</p>
-            <p>把 API 掛到全域並注入樣式。<code>/auto</code> 入口就是不帶參數呼叫它；只用具名 import 的專案不需要呼叫。</p>
+            <p class="sig">register(options?: { global?: boolean; injectStyles?: boolean; target?: object; closeLabel?: string }): ToastApi</p>
+            <p>把 API 掛到全域、注入樣式，並設定全域選項。<code>/auto</code> 入口就是不帶參數呼叫它；只用具名 import 的專案，除非要改 <code>closeLabel</code> 等設定，否則不需要呼叫。</p>
             <div class="table">
               <table>
                 <thead><tr><th>選項</th><th>型別</th><th>預設</th><th>說明</th></tr></thead>
@@ -414,14 +414,20 @@ resume();</code></pre>
                     <td><code>window</code></td>
                     <td>全域掛載的對象</td>
                   </tr>
+                  <tr data-doc="register:closeLabel">
+                    <td><code>closeLabel</code></td>
+                    <td><code>string</code></td>
+                    <td><code>'Close'</code></td>
+                    <td>關閉鈕的 <code>aria-label</code>，螢幕閱讀器會念出來；非英語介面請換成在地語言。套用到之後顯示的通知，空字串或非字串時退回預設</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
             <p>回傳值與 <code>window.toast</code> 是同一個物件，包含 <code>show</code>、<code>success</code>、<code>error</code>、<code>warning</code>、<code>info</code>、<code>dismissAll</code>、<code>resume</code>。</p>
             <pre class="code" data-lang="js"><code>import { register } from '%PKG_NAME%';
 
-// 不碰 window，直接用回傳的物件
-const toast = register({ global: false });
+// 不碰 window，直接用回傳的物件；關閉鈕改念中文
+const toast = register({ global: false, closeLabel: '關閉通知' });
 toast.info('哈囉');</code></pre>
           </section>
 
@@ -499,7 +505,7 @@ toast.info('哈囉');</code></pre>
               <li>滑鼠移上或鍵盤焦點進入時暫停倒數（倒數條同步停住），兩者都離開才恢復，符合 WCAG 2.2.1。</li>
               <li>焦點在通知內時按 <kbd>Esc</kbd> 關閉該則；不攔截頁面其他地方的 <kbd>Esc</kbd>。</li>
               <li>通知關閉時若焦點還在裡面，焦點會交還給觸發它的元素；觸發者已不在頁面上時，移到其他通知的關閉鈕，不會掉回頁首。</li>
-              <li>圖示為 <code>aria-hidden</code>，與藥丸底的對比至少 3:1。關閉鈕的 <code>aria-label</code> 目前固定為「關閉通知」。</li>
+              <li>圖示為 <code>aria-hidden</code>，與藥丸底的對比至少 3:1。關閉鈕的 <code>aria-label</code> 預設為 <code>Close</code>，非英語介面用 <a href="#api-register"><code>register({ closeLabel })</code></a> 換成在地語言。</li>
             </ul>
           </section>
 
