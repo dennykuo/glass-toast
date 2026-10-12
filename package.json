@@ -57,6 +57,7 @@
   "files": [
     "dist",
     "README.md",
+    "README.zh-TW.md",
     "LICENSE"
   ],
   "scripts": {

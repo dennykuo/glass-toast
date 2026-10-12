@@ -1,61 +1,63 @@
 # @dennykuo/glass-toast
 
-毛玻璃質感的 toast 通知元件 — vanilla JS、零 runtime 相依、不需要 Tailwind 或任何框架，開箱即用。
+**English** | [繁體中文](README.zh-TW.md)
 
-- 4 種變體（success / error / warning / info）：彩色圖示藥丸 + 進場 glow ring 脈衝 + 倒數進度條
-- 3 個位置（top-right / bottom-right / bottom-center），各自獨立堆疊容器
-- 毛玻璃外殼（backdrop-filter + 多層陰影），dismiss 時堆疊平滑坍縮回流
-- hover **與鍵盤焦點**皆暫停自動消失（含進度條同步暫停）；`Esc` 關閉聚焦中的 toast、關閉後焦點交還觸發者（WCAG 2.2.1）
-- 內建 dark 外觀（**深色毛玻璃 + 淺字**，保留玻璃身分、避免夜間眩光），自動命中 `prefers-color-scheme` / `[data-theme="dark"]` / `.dark` 三種慣例
-- `prefers-reduced-motion` 完整降級（純淡入、無位移、無 glow；倒數進度條保留，仍提供時間指示）
-- a11y：`role="status"`（一般）/ `role="alert"`（error）+ 對應 `aria-live`（error 為 assertive，其餘 polite），圖示對藥丸底達 ≥3:1 對比；關閉按鈕名稱可用 `closeLabel` 在地化
-- 內嵌 `action` 按鈕（如「重試」）；error 未指定時停留較久（10s），同位置最多同時 4 則、超量自動收合最舊
-- SPA 友善：容器與樣式在 body/head 被替換後自動重建（Astro ViewTransitions 實測）
+Glassmorphism toast notifications — vanilla JS, zero runtime dependencies, no Tailwind or framework required. Works out of the box.
 
-## 安裝
+- 4 variants (success / error / warning / info): colored icon pill, entrance glow-ring pulse, and a countdown progress bar
+- 3 positions (top-right / bottom-right / bottom-center), each with its own stacking container
+- Frosted-glass shell (`backdrop-filter` + layered shadows); the stack collapses smoothly when a toast is dismissed
+- Auto-dismiss pauses on hover **and keyboard focus** (the progress bar pauses too); `Esc` closes the focused toast and focus returns to whatever triggered it (WCAG 2.2.1)
+- Built-in dark appearance (**dark frosted glass with light text** — keeps the glass look without a glaring white card at night), picked up automatically from `prefers-color-scheme`, `[data-theme="dark"]`, or `.dark`
+- Full `prefers-reduced-motion` support (plain fade, no movement, no glow; the countdown bar stays because it conveys remaining time)
+- Accessibility: `role="status"` for regular toasts and `role="alert"` for errors, with matching `aria-live` (assertive for errors, polite otherwise); icons have ≥ 3:1 contrast against their pill; the close button's accessible name can be localized with `closeLabel`
+- Inline `action` button (e.g. "Retry"); errors stay longer by default (10 s); at most 4 toasts per position, the oldest one closes when a fifth arrives
+- SPA-friendly: containers and styles are rebuilt automatically after `<body>` / `<head>` swaps (tested with Astro View Transitions)
+
+## Install
 
 ```bash
 npm install @dennykuo/glass-toast
 ```
 
-## 快速開始
+## Quick start
 
-### 1. side-effect 入口（最省事）
+### 1. Side-effect entry (simplest)
 
 ```js
 import '@dennykuo/glass-toast/auto';
 
-// 樣式已注入、window.toast 已掛載
-toast.success('儲存成功');
-toast.error('連線失敗', { position: 'bottom-center' });
+// Styles are injected and window.toast is ready
+toast.success('Saved');
+toast.error('Connection failed', { position: 'bottom-center' });
 ```
 
-### 2. 具名 import（可 tree-shake、不碰 window）
+### 2. Named imports (tree-shakable, no globals)
 
 ```js
 import { success, show } from '@dennykuo/glass-toast';
 
-success('儲存成功');                 // 首次使用時自動注入樣式
-show('自訂', { type: 'warning', duration: 8000 });
+success('Saved');                   // styles are injected on first use
+show('Custom', { type: 'warning', duration: 8000 });
 ```
 
-搭配顯式樣式（正規做法，CSP / SSR 友善）：
+With an explicit stylesheet (recommended for CSP / SSR):
 
 ```js
 import '@dennykuo/glass-toast/style.css';
 import { register, success } from '@dennykuo/glass-toast';
 
-register({ global: false, injectStyles: false }); // 停用自動注入
-success('儲存成功');
+register({ global: false, injectStyles: false }); // turn off auto-injection
+success('Saved');
 ```
 
-### 3. `<script>` 直接引入（UMD，全域 `GlassToast`）
+### 3. `<script>` tag (UMD, global `GlassToast`)
 
 ```html
 <script src="https://unpkg.com/@dennykuo/glass-toast"></script>
 <script>
-  GlassToast.register(); // 掛 window.toast + 注入樣式
-  toast.info('哈囉');
+  GlassToast.register(); // sets window.toast and injects styles
+  toast.info('Hello');
 </script>
 ```
 
@@ -63,120 +65,125 @@ success('儲存成功');
 
 ### `show(message, options?) => dismiss`
 
-回傳手動關閉函式。快捷方法 `success` / `error` / `warning` / `info` 同簽名（省略 `type`）。
+Returns a function that closes the toast. The shortcuts `success` / `error` / `warning` / `info` have the same signature (minus `type`).
 
-| option | 型別 | 預設 | 說明 |
+| option | type | default | description |
 |---|---|---|---|
-| `type` | `'success' \| 'error' \| 'warning' \| 'info'` | `'info'` | 變體 |
-| `position` | `'top-right' \| 'bottom-right' \| 'bottom-center'` | `'top-right'` | 顯示位置 |
-| `persistent` | `boolean` | `false` | `true` 時不自動消失、無進度條 |
-| `duration` | `number` | `error` 為 `10000`、其餘 `5500` | 自動消失毫秒數；`≤ 0` 視為 `persistent` |
-| `action` | `{ label, onClick }` | — | 內嵌操作按鈕；點擊執行 `onClick` 後自動關閉。未顯式給 `duration` 時預設 `persistent`（需使用者操作） |
+| `type` | `'success' \| 'error' \| 'warning' \| 'info'` | `'info'` | Variant |
+| `position` | `'top-right' \| 'bottom-right' \| 'bottom-center'` | `'top-right'` | Where the toast appears |
+| `persistent` | `boolean` | `false` | When `true`, the toast never auto-dismisses and shows no progress bar |
+| `duration` | `number` | `10000` for `error`, `5500` otherwise | Milliseconds before auto-dismiss; `≤ 0` is treated as `persistent` |
+| `action` | `{ label, onClick }` | — | Inline action button; runs `onClick`, then closes the toast. Without an explicit `duration`, toasts with an action are `persistent` (they need a user decision) |
 
-訊息走 `textContent`，不解析 HTML，塞什麼字串都安全（`action.label` 亦然）。
+Messages are written with `textContent` and never parsed as HTML, so any string is safe (`action.label` too).
 
 ```js
 import { error } from '@dennykuo/glass-toast';
 
-error('上傳失敗，是否重試？', {
-  action: { label: '重試', onClick: () => retryUpload() },
+error('Upload failed. Retry?', {
+  action: { label: 'Retry', onClick: () => retryUpload() },
 });
 ```
 
 ### `dismissAll(options?)`
 
-清空所有 toast。**預設只清空、不影響後續 `show()`**。若要鎖住後續 toast（供「session 過期 → 硬導航登入頁」情境，避免 redirect 與 unload 之間閃現新 toast）傳 `{ suppress: true }`；整頁重載後自動解鎖，SPA 不重載時用 `resume()` 解鎖：
+Clears every toast. **By default it only clears; later `show()` calls work as usual.** Pass `{ suppress: true }` to also block later toasts — useful when a session expires and you hard-navigate to the login page, so nothing flashes between the redirect and unload. A full page reload unblocks automatically; in an SPA without a reload, call `resume()`:
 
 ```js
-dismissAll();                   // 只清空（預設）
-dismissAll({ suppress: true }); // 清空並鎖住後續 show()（硬導航前）
-resume();                       // SPA 不重載時手動解鎖
+dismissAll();                   // clear only (default)
+dismissAll({ suppress: true }); // clear and block later show() calls (before a hard navigation)
+resume();                       // unblock manually in an SPA
 ```
 
 ### `register(options?) => api`
 
-掛載全域 + 注入樣式（`/auto` 入口等價於無參數呼叫本函式）。
+Sets up the global and injects styles (the `/auto` entry is the same as calling this with no options).
 
-| option | 預設 | 說明 |
+| option | default | description |
 |---|---|---|
-| `global` | `true` | 掛 `target.toast` |
-| `injectStyles` | `true` | `false` 時全面停用自動樣式注入 |
-| `target` | `window` | 全域掛載目標 |
-| `closeLabel` | `'Close'` | 關閉按鈕的 `aria-label`；非英語介面請換成在地語言，例如 `register({ closeLabel: '關閉通知' })` |
+| `global` | `true` | Assign the API to `target.toast` |
+| `injectStyles` | `true` | `false` turns off automatic style injection entirely |
+| `target` | `window` | Object that receives the global |
+| `closeLabel` | `'Close'` | The close button's `aria-label`; set it to your UI language, e.g. `register({ closeLabel: 'Schließen' })` |
 
 ### `ensureStyles()`
 
-冪等注入樣式（`show()` 每次都會 cheap re-check，SPA 換頁把 `<head>` 注入的樣式拔掉也會自我修復）。SSR（無 `document`）為 no-op。
+Injects the styles idempotently. `show()` does a cheap re-check every time, so it also recovers if an SPA navigation removes the injected `<style>` from `<head>`. No-op during SSR (no `document`).
 
-## 樣式客製（CSS 變數）
+## Theming (CSS variables)
 
-所有顏色走 `--gt-*` custom properties，scope 在 `.glass-toast` 上、不污染 `:root`。在你的 stylesheet 覆蓋即可：
+All colors go through `--gt-*` custom properties scoped to `.glass-toast`, so nothing leaks onto `:root`. Override them in your own stylesheet:
 
 ```css
 .glass-toast { --gt-text: #333; --gt-radius: 0.5rem; }
 .glass-toast--success { --gt-icon: #0a7d4f; --gt-ring: 10, 125, 79; }
 ```
 
-| 變數 | 預設（light） | 說明 |
+| variable | default (light) | description |
 |---|---|---|
-| `--gt-bg` | `rgba(255,255,255,.8)` | 外殼底色 |
-| `--gt-bg-opaque` | `rgba(255,255,255,.96)` | backdrop-filter 不支援時的後備底色 |
-| `--gt-border` | `rgba(229,231,235,.4)` | 外殼邊線 |
-| `--gt-text` | `#4a5565` | 訊息文字 |
-| `--gt-blur` | `24px` | 毛玻璃模糊半徑 |
-| `--gt-radius` | `1rem` | 外殼圓角 |
-| `--gt-shadow` | 多層陰影 | 外殼陰影（glow ring 疊加其上） |
-| `--gt-close-*` | gray 系 | 關閉鈕 bg / border / text（含 `-hover`） |
-| `--gt-focus-ring` | `#2563eb`（dark `#93c5fd`） | 關閉鈕 / action 鈕 focus-visible ring |
-| `--gt-action-*` | 承變體色 | action 鈕 bg / border / text（含 `-bg-hover`）；預設透明底 + 變體色字 |
-| `--gt-pill-bg` / `--gt-icon` / `--gt-bar` | 依變體 | 圖示藥丸底 / 圖示色 / 進度條色 |
-| `--gt-ring` | 依變體 | glow ring 的 `R, G, B` 三元組（餵給 `el.animate()`） |
+| `--gt-bg` | `rgba(255,255,255,.8)` | Shell background |
+| `--gt-bg-opaque` | `rgba(255,255,255,.96)` | Fallback background when `backdrop-filter` is unsupported |
+| `--gt-border` | `rgba(229,231,235,.4)` | Shell border |
+| `--gt-text` | `#4a5565` | Message text |
+| `--gt-blur` | `24px` | Frosted-glass blur radius |
+| `--gt-radius` | `1rem` | Shell corner radius |
+| `--gt-shadow` | layered shadow | Shell shadow (the glow ring is drawn on top) |
+| `--gt-close-*` | grays | Close button bg / border / text (plus `-hover` versions) |
+| `--gt-focus-ring` | `#2563eb` (dark: `#93c5fd`) | Focus-visible ring for the close and action buttons |
+| `--gt-action-*` | follows the variant | Action button bg / border / text (plus `-bg-hover`); transparent background with variant-colored text by default |
+| `--gt-pill-bg` / `--gt-icon` / `--gt-bar` | per variant | Icon pill / icon color / progress bar |
+| `--gt-ring` | per variant | Glow-ring color as an `R, G, B` triplet (fed to `el.animate()`) |
 
-### Dark 外觀
+### Dark appearance
 
-dark 為**深色毛玻璃**（低亮度半透明底 `rgba(28,28,30,.72)` + 淺字），保留玻璃身分、避免夜間白卡眩光；變體藥丸/圖示沿用 base（淺色亮片 + 700 階圖示在深底上仍清晰），只覆寫外殼、關閉鈕與 focus ring。
+Dark mode is **dark frosted glass** (a low-luminance translucent background, `rgba(28,28,30,.72)`, with light text) — it keeps the glass look without a glaring white card at night. Variant pills and icons reuse the light values (light chips with 700-shade icons stay legible on dark); only the shell, the close button, and the focus ring are overridden.
 
-以下三種慣例任一成立即套用（頁面明示 `data-theme="light"` / `.light` 時 OS 深色讓路）：
+It applies when any of these is true (an explicit `data-theme="light"` or `.light` on the page wins over the OS setting):
 
 1. `@media (prefers-color-scheme: dark)`
 2. `<html data-theme="dark">`
-3. `<html class="dark">`（Tailwind 慣例）
+3. `<html class="dark">` (Tailwind convention)
 
-dark 覆寫全部走 `:where()` 壓成與 base 相同的 specificity，你的覆蓋規則永遠不需要跟套件比權重。
+All dark overrides use `:where()` to keep the same specificity as the base rules, so your overrides never have to fight the package's selectors.
 
-## CSP / SSR 註記
+## CSP / SSR notes
 
-- 嚴格 CSP（禁 inline `<style>`）：改顯式 `import '@dennykuo/glass-toast/style.css'` + `register({ injectStyles: false })`
-- 已自行載入 style.css 且想避免重複注入：在你的 `<link>` / `<style>` 加 `data-glass-toast` 屬性即可被偵測跳過
-- SSR：所有入口在無 `document` 環境安全 no-op，`show()` 請在 client 端呼叫
+- Strict CSP (no inline `<style>`): import `'@dennykuo/glass-toast/style.css'` explicitly and call `register({ injectStyles: false })`
+- Already loading the stylesheet yourself and want to avoid a duplicate: add a `data-glass-toast` attribute to your `<link>` / `<style>` and auto-injection will detect it and skip
+- SSR: every entry point is a safe no-op without `document`; call `show()` on the client only
 
-## 開發
+## Development
 
 ```bash
-npm run dev         # 文件站：/ 文件、/demo.html 互動 playground
-npm test            # vitest + jsdom（含文件覆蓋率守門）
-npm run lint        # eslint
-npm run build       # dist/：ESM + UMD + CSS + .d.ts / .d.cts
-npm run check:package  # publint + attw：確認 exports 與 ESM / CJS 型別都正確（prepublishOnly 會自動跑）
-npm run build:docs  # dist-docs/：文件站靜態檔（相對路徑，可直接部署到 GitHub Pages）
+npm run dev            # docs site: / docs, /demo.html interactive playground
+npm test               # vitest + jsdom (includes documentation coverage guards)
+npm run lint           # eslint
+npm run build          # dist/: ESM + UMD + CSS + .d.ts / .d.cts
+npm run check:package  # publint + attw: verifies exports and ESM / CJS types (runs automatically in prepublishOnly)
+npm run build:docs     # dist-docs/: static docs site (relative paths, ready for GitHub Pages)
 ```
 
-文件站整個放在 `docs/`：
+The docs site lives entirely in `docs/` (the site content is currently in Traditional Chinese):
 
 ```
 docs/
-  index.html        文件（首頁）
-  demo.html         互動 playground
-  partials/         共用 HTML 片段，由 vite.config.js 在建置時插入
-  site.css          共用樣式
-  site.js           共用腳本
-  scrollspy.js      文件目錄的捲動同步判斷（純函式，test/scrollspy.test.js）
-  vite.config.js    文件站設定（vite docs 自動讀取）
+  index.html        Docs (home page)
+  demo.html         Interactive playground
+  partials/         Shared HTML fragments, inserted at build time by vite.config.js
+  site.css          Shared styles
+  site.js           Shared scripts
+  scrollspy.js      Table-of-contents scroll sync (pure function, test/scrollspy.test.js)
+  vite.config.js    Docs site config (picked up automatically by `vite docs`)
 ```
 
-頁面一律平放在 `docs/` 根目錄，partial 裡的站內連結都寫 `./`；套件名稱與版本以 `%PKG_NAME%` 等從 `package.json` 帶入。
+Pages sit flat in the `docs/` root, so links inside partials always use `./`. The package name and version come from `package.json` via `%PKG_NAME%` and friends.
 
-`test/docs.test.js` 會從原始碼掃出公開 API、`show()` / `register()` 選項與所有 `--gt-*` 變數，逐一確認 `docs/index.html` 有對應的 `data-doc` 條目——新增 API 時記得一併補文件。
+Documentation coverage is guarded by tests that scan the source for the public API, the `show()` / `register()` options, and every `--gt-*` variable:
+
+- `test/docs.test.js` checks that `docs/index.html` has a matching `data-doc` entry for each
+- `test/readme.test.js` checks that both `README.md` and `README.zh-TW.md` mention every export and option, and link to each other
+
+When you add an API, update all of them.
 
 ## License
 
