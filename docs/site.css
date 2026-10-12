@@ -354,6 +354,11 @@ a { color: var(--accent); text-underline-offset: 3px; }
 .code-block > .code { padding-right: 4.75rem; }
 .code-block__copy { position: absolute; top: 0.55rem; right: 0.55rem; background: var(--field-on); }
 
+/* 窄螢幕的長行會橫向捲到鈕底下，右側留白擋不住；改把程式碼整段往下推，讓出鈕的高度 */
+@media (max-width: 640px) {
+  .code-block > .code { padding-top: 2.9rem; padding-right: 1.1rem; }
+}
+
 .tok-kw  { color: var(--tok-kw); }
 .tok-str { color: var(--tok-str); }
 .tok-fn  { color: var(--tok-fn); }
