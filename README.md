@@ -155,7 +155,8 @@ dark 覆寫全部走 `:where()` 壓成與 base 相同的 specificity，你的覆
 npm run dev         # 文件站：/ 文件、/demo.html 互動 playground
 npm test            # vitest + jsdom（含文件覆蓋率守門）
 npm run lint        # eslint
-npm run build       # dist/：ESM + UMD + CSS + .d.ts
+npm run build       # dist/：ESM + UMD + CSS + .d.ts / .d.cts
+npm run check:package  # publint + attw：確認 exports 與 ESM / CJS 型別都正確（prepublishOnly 會自動跑）
 npm run build:docs  # dist-docs/：文件站靜態檔（相對路徑，可直接部署到 GitHub Pages）
 ```
 
