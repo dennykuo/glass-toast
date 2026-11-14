@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.1 (unpublished)
+## 0.1.1 (2026-11-14)
 
 ### Added
 

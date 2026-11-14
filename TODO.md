@@ -1,6 +1,6 @@
 # glass-toast 後續工作清單
 
-更新日期：2026-11-14（Asia/Taipei）。文件站已上線，`0.1.1` 的追加修正已在本機驗證。
+更新日期：2026-11-14（Asia/Taipei）。`0.1.1` 已在 npm 發布，正式文件站與互動 Demo 已更新。
 
 本清單接續 Polyscope 副本的 `.context/next-steps.md`，供原專案後續開發使用。
 歷史紀錄仍保留在原副本；以下狀態以本次核對為準。
@@ -9,9 +9,9 @@
 
 - 本輪變更接續 `develop` 上從 Polyscope 恢復的 8 個提交。
 - 每筆推送的驗證結果見 [develop 的 GitHub Actions](https://github.com/dennykuo/glass-toast/actions?query=branch%3Adevelop)。
-- 本機待發布版本為 `0.1.1`，npm 上的 `latest` 仍為 `0.1.0`。
-- `0.1.1` 準備變更已收錄於本機 `develop` 和 `main`，待推送。
-- 目前正式文件站的部署提交為 `d9b5e12`。
+- [npm `0.1.1`](https://www.npmjs.com/package/@dennykuo/glass-toast/v/0.1.1) 是目前的 `latest`。
+- `0.1.1` 的發布提交 `326f319` 已推送至遠端 `develop` 和 `main`。
+- 正式文件站部署自 `326f319`；[main 手動 CI](https://github.com/dennykuo/glass-toast/actions/runs/43611100071) 的檢查與部署皆成功。
 - [GitHub Pages 文件站](https://dennykuo.github.io/glass-toast/) 已上線，發布來源為 GitHub Actions。
 
 ## 本輪五項已完成
@@ -96,7 +96,9 @@ ESLint 10 的依賴仍要求 Minimatch 10；
    正式首頁與 Demo 回傳 200，Chromium 桌面和 WebKit 390px 均通過資源載入、深色跨頁保留及「重試」操作。
 3. [x] `package.json` 的 `homepage` 已指向 GitHub Pages，英文與繁中 README 均已加入文件站與互動 Demo 連結。
 4. [x] 準備 `0.1.1` 版本與 CHANGELOG，檢查最終 npm 封裝及型別。
-5. [ ] 依舊清單由使用者執行 `npm publish`，再驗證 npm／CDN 實際安裝與載入。若 `main` 的 CI 已因版本未發布略過部署，發布後在 `main` 手動執行 CI，確認線上文件版號、安裝與 CDN 範例一致。
+5. [x] 發布 `0.1.1`，從公開 npm registry 在乾淨專案安裝，確認 ESM、CommonJS、`/auto`、CSS 入口及封裝雜湊。
+   在瀏覽器驗證 [UNPKG 的 UMD 入口](https://unpkg.com/@dennykuo/glass-toast@0.1.1)與 [jsDelivr 的 ESM 入口](https://cdn.jsdelivr.net/npm/@dennykuo/glass-toast@0.1.1/dist/glass-toast.js)都能顯示及關閉通知。
+   [main 手動 CI](https://github.com/dennykuo/glass-toast/actions/runs/43611100071) 部署成功；用桌面 Chromium 與手機尺寸的 WebKit 確認正式文件站與 Demo 顯示 `v0.1.1`，安裝與 CDN 範例皆使用 `0.1.1`，Demo 可重試及關閉通知。
 
 ## 本輪驗證紀錄
 
