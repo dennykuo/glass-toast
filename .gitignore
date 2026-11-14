@@ -2,3 +2,5 @@ node_modules/
 dist/
 *.tgz
 dist-docs/
+test-results/
+playwright-report/

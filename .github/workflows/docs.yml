@@ -8,8 +8,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 # 同時只跑一次部署；新的 push 不取消進行中的部署，避免站台停在一半
 concurrency:
@@ -17,26 +15,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: package.json # 讀 engines.node
-          cache: npm
-
-      - run: npm ci
-      - run: npm run build:docs
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist-docs
+  check:
+    # 手動執行也只能發佈 main，避免將 develop 的測試版本送到正式文件站。
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/checks.yml
+    with:
+      upload-pages: true
 
   deploy:
-    needs: build
+    needs: check
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

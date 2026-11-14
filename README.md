@@ -32,6 +32,8 @@ toast.success('Saved');
 toast.error('Connection failed', { position: 'bottom-center' });
 ```
 
+`/auto` is an ES module. CommonJS can load it with `require()` on supported Node versions (22.13+ within 22.x, or 24+). It sets up the global and injects styles when a browser DOM is present.
+
 ### 2. Named imports (tree-shakable, no globals)
 
 ```js
@@ -130,13 +132,13 @@ All colors go through `--gt-*` custom properties scoped to `.glass-toast`, so no
 | `--gt-shadow` | layered shadow | Shell shadow (the glow ring is drawn on top) |
 | `--gt-close-*` | grays | Close button bg / border / text (plus `-hover` versions) |
 | `--gt-focus-ring` | `#2563eb` (dark: `#93c5fd`) | Focus-visible ring for the close and action buttons |
-| `--gt-action-*` | follows the variant | Action button bg / border / text (plus `-bg-hover`); transparent background with variant-colored text by default |
+| `--gt-action-*` | follows the appearance | Action button bg / border / text (plus `-bg-hover`); light mode uses variant-colored text (error uses red-700), dark mode uses message text and a neutral hover background |
 | `--gt-pill-bg` / `--gt-icon` / `--gt-bar` | per variant | Icon pill / icon color / progress bar |
 | `--gt-ring` | per variant | Glow-ring color as an `R, G, B` triplet (fed to `el.animate()`) |
 
 ### Dark appearance
 
-Dark mode is **dark frosted glass** (a low-luminance translucent background, `rgba(28,28,30,.72)`, with light text) — it keeps the glass look without a glaring white card at night. Variant pills and icons reuse the light values (light chips with 700-shade icons stay legible on dark); only the shell, the close button, and the focus ring are overridden.
+Dark mode is **dark frosted glass** (a low-luminance translucent background, `rgba(28,28,30,.72)`, with light text) — it keeps the glass look without a glaring white card at night. Variant pills and icons reuse the light values. The shell, close button and focus ring are overridden; action buttons use the message text color and a neutral hover background so small text stays legible.
 
 It applies when any of these is true (an explicit `data-theme="light"` or `.light` on the page wins over the OS setting):
 
@@ -154,10 +156,15 @@ All dark overrides use `:where()` to keep the same specificity as the base rules
 
 ## Development
 
+Use Node 24 (`nvm use`; CI reads `.nvmrc`). Node 22.13+ is also supported on the 22.x line.
+
 ```bash
+npm ci --ignore-scripts # install from the lockfile without dependency lifecycle scripts
+npx playwright install chromium firefox webkit # one-time browser setup
 npm run dev            # docs site: / docs, /demo.html interactive playground
 npm test               # vitest + jsdom (includes documentation coverage guards)
-npm run lint           # eslint
+npm run test:browser   # Chromium, Firefox, and WebKit at desktop and mobile widths
+npm run lint           # ESLint, including docs scripts
 npm run build          # dist/: ESM + UMD + CSS + .d.ts / .d.cts
 npm run check:package  # publint + attw: verifies exports and ESM / CJS types (runs automatically in prepublishOnly)
 npm run build:docs     # dist-docs/: static docs site (relative paths, ready for GitHub Pages)
@@ -171,12 +178,25 @@ docs/
   demo.html         Interactive playground
   partials/         Shared HTML fragments, inserted at build time by vite.config.js
   site.css          Shared styles
+  index.js          Docs page interactions
+  demo.js           Demo page interactions
   site.js           Shared scripts
+  public/appearance.js  Restores appearance before the page is painted
   scrollspy.js      Table-of-contents scroll sync (pure function, test/scrollspy.test.js)
   vite.config.js    Docs site config (picked up automatically by `vite docs`)
 ```
 
 Pages sit flat in the `docs/` root, so links inside partials always use `./`. The package name and version come from `package.json` via `%PKG_NAME%` and friends.
+
+CI checks pushes to `main` and `develop`, plus pull requests. CI and Pages share
+`.github/workflows/checks.yml`: lint, unit tests, dependency audit, browser tests,
+package validation, and the docs build must pass before the Pages artifact is uploaded.
+Pages deploys that validated artifact from `main` only, including manual runs.
+
+The development-only `minimatch` override selects v11 while ESLint still requests v10,
+to address [GHSA-g3hv-75wg-m249](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249).
+Its file selection, ignore patterns, and error reporting have been checked with this project.
+Revisit the override when updating ESLint; remove it once upstream dependencies include the fix.
 
 Documentation coverage is guarded by tests that scan the source for the public API, the `show()` / `register()` options, and every `--gt-*` variable:
 

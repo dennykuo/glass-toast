@@ -32,6 +32,8 @@ toast.success('儲存成功');
 toast.error('連線失敗', { position: 'bottom-center' });
 ```
 
+`/auto` 是 ES 模組。在支援的 Node 版本（22.x 自 22.13 起，或 24 以上），CommonJS 也可以用 `require()` 載入。有瀏覽器 DOM 時才會掛載全域與注入樣式。
+
 ### 2. 具名 import（可 tree-shake、不碰 window）
 
 ```js
@@ -130,13 +132,13 @@ resume();                       // SPA 不重載時手動解鎖
 | `--gt-shadow` | 多層陰影 | 外殼陰影（glow ring 疊加其上） |
 | `--gt-close-*` | gray 系 | 關閉鈕 bg / border / text（含 `-hover`） |
 | `--gt-focus-ring` | `#2563eb`（dark `#93c5fd`） | 關閉鈕 / action 鈕 focus-visible ring |
-| `--gt-action-*` | 承變體色 | action 鈕 bg / border / text（含 `-bg-hover`）；預設透明底 + 變體色字 |
+| `--gt-action-*` | 隨外觀調整 | action 鈕 bg / border / text（含 `-bg-hover`）；淺色使用變體文字色（error 為 red-700），深色使用訊息文字色與中性 hover 底色 |
 | `--gt-pill-bg` / `--gt-icon` / `--gt-bar` | 依變體 | 圖示藥丸底 / 圖示色 / 進度條色 |
 | `--gt-ring` | 依變體 | glow ring 的 `R, G, B` 三元組（餵給 `el.animate()`） |
 
 ### Dark 外觀
 
-dark 為**深色毛玻璃**（低亮度半透明底 `rgba(28,28,30,.72)` + 淺字），保留玻璃身分、避免夜間白卡眩光；變體藥丸/圖示沿用 base（淺色亮片 + 700 階圖示在深底上仍清晰），只覆寫外殼、關閉鈕與 focus ring。
+dark 為**深色毛玻璃**（低亮度半透明底 `rgba(28,28,30,.72)` + 淺字），保留玻璃身分、避免夜間白卡眩光；變體藥丸／圖示沿用 base。除外殼、關閉鈕與 focus ring 外，action 改用訊息文字色與中性 hover 底色，維持小字的可讀性。
 
 以下三種慣例任一成立即套用（頁面明示 `data-theme="light"` / `.light` 時 OS 深色讓路）：
 
@@ -154,10 +156,15 @@ dark 覆寫全部走 `:where()` 壓成與 base 相同的 specificity，你的覆
 
 ## 開發
 
+建議使用 Node 24（`nvm use`；CI 讀取 `.nvmrc`）。22.x 系列最低為 Node 22.13。
+
 ```bash
+npm ci --ignore-scripts # 依 lockfile 安裝，不執行依賴的生命週期腳本
+npx playwright install chromium firefox webkit # 首次安裝瀏覽器
 npm run dev         # 文件站：/ 文件、/demo.html 互動 playground
 npm test            # vitest + jsdom（含文件覆蓋率守門）
-npm run lint        # eslint
+npm run test:browser # Chromium、Firefox、WebKit，涵蓋桌機與手機寬度
+npm run lint        # ESLint，含文件站腳本
 npm run build       # dist/：ESM + UMD + CSS + .d.ts / .d.cts
 npm run check:package  # publint + attw：確認 exports 與 ESM / CJS 型別都正確（prepublishOnly 會自動跑）
 npm run build:docs  # dist-docs/：文件站靜態檔（相對路徑，可直接部署到 GitHub Pages）
@@ -171,12 +178,25 @@ docs/
   demo.html         互動 playground
   partials/         共用 HTML 片段，由 vite.config.js 在建置時插入
   site.css          共用樣式
+  index.js          文件首頁互動
+  demo.js           Demo 互動
   site.js           共用腳本
+  public/appearance.js  首次繪製前套用外觀
   scrollspy.js      文件目錄的捲動同步判斷（純函式，test/scrollspy.test.js）
   vite.config.js    文件站設定（vite docs 自動讀取）
 ```
 
 頁面一律平放在 `docs/` 根目錄，partial 裡的站內連結都寫 `./`；套件名稱與版本以 `%PKG_NAME%` 等從 `package.json` 帶入。
+
+CI 檢查 `main`、`develop` 的 push 與所有 PR。CI 和 Pages 共用
+`.github/workflows/checks.yml`；lint、單元測試、依賴掃描、瀏覽器測試、套件檢查與
+文件站建置全部成功後，才會上傳 Pages 產物。Pages 僅部署該次驗證的 `main` 產物，
+手動執行也適用同一限制。
+
+開發依賴暫以 `minimatch` override 選用 v11，處理 ESLint 仍要求 v10 時的
+[GHSA-g3hv-75wg-m249](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249)。
+已核對本專案的檔案選取、忽略規則與錯誤偵測。後續更新 ESLint 時需重新檢查，
+待上游直接採用修補版後移除 override。
 
 文件覆蓋率由測試守門，從原始碼掃出公開 API、`show()` / `register()` 選項與所有 `--gt-*` 變數：
 
