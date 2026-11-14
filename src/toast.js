@@ -254,9 +254,9 @@ function dismissToast(el, position, invoker) {
   if (el.dataset.dismissing) return;
   el.dataset.dismissing = 'true';
 
-  // 移除前記錄焦點是否還在 toast 內，移除後才好交還
-  const hadFocus = el.contains(document.activeElement);
   const finish = () => {
+    // 退場期間使用者可能已移走焦點，只交還移除當下仍在通知內的焦點。
+    const hadFocus = el.contains(document.activeElement);
     removeAndCleanup(el, position);
     if (hadFocus) restoreFocus(invoker);
   };

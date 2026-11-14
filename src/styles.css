@@ -105,6 +105,7 @@
 .glass-toast--error {
     --gt-pill-bg: #ffe2e2; /* red-100 */
     --gt-icon: #dc2626;    /* red-600 */
+    --gt-action-text: #b91c1c; /* red-700：小字在 hover 的淺紅底也達 4.5:1 */
     --gt-bar: #ff6568;     /* red-400 */
     --gt-ring: 239, 68, 68;
 }
@@ -285,7 +286,7 @@
    靠檔案順序（後者勝）生效，消費端覆蓋不需要提高 specificity。
 
    變體藥丸/圖示/進度條沿用 base（淺色亮片 + 700 階圖示在深底上仍清晰），
-   只覆寫外殼、關閉鈕與 focus ring，DRY 且一致。
+   action 使用訊息文字色與關閉鈕的 hover 底色，避免小字沿用深色圖示而對比不足。
    ========================================================================== */
 
 @media (prefers-color-scheme: dark) {
@@ -301,6 +302,8 @@
         --gt-close-border-hover: rgba(255, 255, 255, 0.22);
         --gt-close-text-hover: #f1f5f9;        /* slate-100 */
         --gt-focus-ring: #93c5fd;              /* blue-300：對深底 focus 明確 */
+        --gt-action-text: var(--gt-text);
+        --gt-action-bg-hover: var(--gt-close-bg-hover);
     }
 }
 
@@ -316,4 +319,6 @@
     --gt-close-border-hover: rgba(255, 255, 255, 0.22);
     --gt-close-text-hover: #f1f5f9;
     --gt-focus-ring: #93c5fd;
+    --gt-action-text: var(--gt-text);
+    --gt-action-bg-hover: var(--gt-close-bg-hover);
 }

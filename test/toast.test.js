@@ -662,23 +662,85 @@ describe('escape to dismiss', () => {
   });
 });
 
-describe('focus return', () => {
-  it('dismiss 後把焦點交還觸發者', async () => {
+describe.each([false, true])('focus return (reduced motion: %s)', (reducedMotion) => {
+  beforeEach(() => {
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: reducedMotion }));
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  async function focusedToast() {
     vi.useFakeTimers();
     const { show } = await loadToast();
     const invoker = document.createElement('button');
-    document.body.appendChild(invoker);
+    const other = document.createElement('button');
+    document.body.append(invoker, other);
     invoker.focus();
-
     const dismiss = show('fr', { persistent: true });
-    const closeBtn = document.querySelector('.glass-toast__close');
-    closeBtn.focus();
-    expect(document.activeElement).toBe(closeBtn);
+    const close = document.querySelector('.glass-toast__close');
+    close.focus();
+    return { invoker, other, dismiss, close };
+  }
 
+  it('dismiss 後把焦點交還觸發者', async () => {
+    const { invoker, dismiss } = await focusedToast();
     dismiss();
     vi.advanceTimersByTime(280);
-
     expect(document.activeElement).toBe(invoker);
+  });
+
+  it('退場期間焦點已移往別處時保留使用者的新焦點', async () => {
+    const { other, dismiss } = await focusedToast();
+    dismiss();
+    other.focus();
+    vi.advanceTimersByTime(280);
+    expect(document.querySelector('.glass-toast')).toBeNull();
+    expect(document.activeElement).toBe(other);
+  });
+});
+
+describe('hover 與鍵盤焦點的交錯暫停', () => {
+  it.each(['hover', 'focus'])('只剩 %s 時仍暫停，兩者都離開才恢復', async (remaining) => {
+    vi.useFakeTimers();
+    const { show } = await loadToast();
+    const outside = document.createElement('button');
+    document.body.append(outside);
+    show('both', { duration: 2000 });
+    const toast = document.querySelector('.glass-toast');
+    const close = toast.querySelector('.glass-toast__close');
+    close.focus();
+    toast.dispatchEvent(new MouseEvent('mouseenter'));
+
+    const leaveHover = () => toast.dispatchEvent(new MouseEvent('mouseleave'));
+    const leaveFocus = () => outside.focus();
+    const first = remaining === 'hover' ? leaveFocus : leaveHover;
+    const last = remaining === 'hover' ? leaveHover : leaveFocus;
+    first();
+    vi.advanceTimersByTime(2500);
+    expect(toast.isConnected).toBe(true);
+    expect(toast.dataset.dismissing).toBeUndefined();
+
+    last();
+    vi.advanceTimersByTime(2000 + 280);
+    expect(toast.isConnected).toBe(false);
+  });
+
+  it('action 與關閉鈕之間切換焦點不恢復倒數', async () => {
+    vi.useFakeTimers();
+    const { show } = await loadToast();
+    show('action focus', { duration: 2000, action: { label: 'Retry', onClick() {} } });
+    const toast = document.querySelector('.glass-toast');
+    const action = toast.querySelector('.glass-toast__action');
+    const close = toast.querySelector('.glass-toast__close');
+    action.focus();
+    vi.advanceTimersByTime(1000);
+    close.focus();
+    vi.advanceTimersByTime(2500);
+    expect(toast.isConnected).toBe(true);
+    expect(toast.dataset.dismissing).toBeUndefined();
+    close.blur();
+    vi.advanceTimersByTime(2000 + 280);
+    expect(toast.isConnected).toBe(false);
   });
 });
 
