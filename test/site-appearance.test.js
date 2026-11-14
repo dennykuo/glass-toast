@@ -1,12 +1,16 @@
 // 文件站的外觀 / 背景選擇要跨頁（文件 ↔ Demo）與重新載入保留。
-// 直接用真正的 head / topbar partial 組頁面，在 jsdom 裡跑 head 的 inline script。
+// 用真正的 head / topbar partial 組頁面，將外觀腳本載入 jsdom。
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { JSDOM } from 'jsdom';
 
 const read = (path) => readFileSync(resolve(import.meta.dirname, '..', path), 'utf8');
-const PAGE = `<!doctype html><html data-backdrop="aurora"><head>${read('docs/partials/head.html')}</head>`
+const head = read('docs/partials/head.html').replace(
+  '<script src="/appearance.js"></script>',
+  () => `<script>${read('docs/public/appearance.js')}</script>`,
+);
+const PAGE = `<!doctype html><html data-backdrop="aurora"><head>${head}</head>`
   + `<body>${read('docs/partials/topbar.html')}</body></html>`;
 
 /** 載入一頁並等到 DOMContentLoaded；storage 帶入上一頁留下的 localStorage 內容（模擬換頁 / 重新載入） */

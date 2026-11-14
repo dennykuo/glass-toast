@@ -18,6 +18,19 @@ export default [
     },
   },
   {
-    ignores: ['dist/**', 'node_modules/**', 'docs/**'],
+    files: ['docs/**/*.js'],
+    ignores: ['docs/vite.config.js'],
+    languageOptions: { globals: globals.browser },
+  },
+  {
+    files: ['docs/vite.config.js'],
+    languageOptions: { globals: globals.node },
+  },
+  {
+    files: ['docs/public/appearance.js'],
+    languageOptions: { sourceType: 'script' },
+  },
+  {
+    ignores: ['dist/**', 'dist-docs/**', 'node_modules/**'],
   },
 ];
