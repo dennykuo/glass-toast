@@ -2,22 +2,24 @@
 
 **English** | [繁體中文](README.zh-TW.md)
 
+[Documentation (繁體中文)](https://dennykuo.github.io/glass-toast/) · [Interactive demo](https://dennykuo.github.io/glass-toast/demo.html)
+
 Glassmorphism toast notifications — vanilla JS, zero runtime dependencies, no Tailwind or framework required. Works out of the box.
 
 - 4 variants (success / error / warning / info): colored icon pill, entrance glow-ring pulse, and a countdown progress bar
 - 3 positions (top-right / bottom-right / bottom-center), each with its own stacking container
 - Frosted-glass shell (`backdrop-filter` + layered shadows); the stack collapses smoothly when a toast is dismissed
-- Auto-dismiss pauses on hover **and keyboard focus** (the progress bar pauses too); `Esc` closes the focused toast and focus returns to whatever triggered it (WCAG 2.2.1)
+- Auto-dismiss and the progress bar pause on hover and keyboard focus. Press `Esc` to close the focused toast.
 - Built-in dark appearance (**dark frosted glass with light text** — keeps the glass look without a glaring white card at night), picked up automatically from `prefers-color-scheme`, `[data-theme="dark"]`, or `.dark`
 - Full `prefers-reduced-motion` support (plain fade, no movement, no glow; the countdown bar stays because it conveys remaining time)
-- Accessibility: `role="status"` for regular toasts and `role="alert"` for errors, with matching `aria-live` (assertive for errors, polite otherwise); icons have ≥ 3:1 contrast against their pill; the close button's accessible name can be localized with `closeLabel`
+- Separate live regions announce regular messages as `status` and errors as `alert`. Localize the close button’s accessible name with `closeLabel`.
 - Inline `action` button (e.g. "Retry"); errors stay longer by default (10 s); at most 4 toasts per position, the oldest one closes when a fifth arrives
 - SPA-friendly: containers and styles are rebuilt automatically after `<body>` / `<head>` swaps (tested with Astro View Transitions)
 
 ## Install
 
 ```bash
-npm install @dennykuo/glass-toast
+npm install @dennykuo/glass-toast@0.1.1
 ```
 
 ## Quick start
@@ -56,7 +58,7 @@ success('Saved');
 ### 3. `<script>` tag (UMD, global `GlassToast`)
 
 ```html
-<script src="https://unpkg.com/@dennykuo/glass-toast"></script>
+<script src="https://unpkg.com/@dennykuo/glass-toast@0.1.1"></script>
 <script>
   GlassToast.register(); // sets window.toast and injects styles
   toast.info('Hello');
@@ -150,6 +152,8 @@ All dark overrides use `:where()` to keep the same specificity as the base rules
 
 ## CSP / SSR notes
 
+Use `persistent: true` for important messages or actions available only in the toast, or provide another way to access them after it closes. See [WCAG 2.2.1 Timing Adjustable](https://www.w3.org/WAI/WCAG22/Understanding/timing-adjustable.html).
+
 - Strict CSP (no inline `<style>`): import `'@dennykuo/glass-toast/style.css'` explicitly and call `register({ injectStyles: false })`
 - Already loading the stylesheet yourself and want to avoid a duplicate: add a `data-glass-toast` attribute to your `<link>` / `<style>` and auto-injection will detect it and skip
 - SSR: every entry point is a safe no-op without `document`; call `show()` on the client only
@@ -166,7 +170,7 @@ npm test               # vitest + jsdom (includes documentation coverage guards)
 npm run test:browser   # Chromium, Firefox, and WebKit at desktop and mobile widths
 npm run lint           # ESLint, including docs scripts
 npm run build          # dist/: ESM + UMD + CSS + .d.ts / .d.cts
-npm run check:package  # publint + attw: verifies exports and ESM / CJS types (runs automatically in prepublishOnly)
+npm run check:package  # lint the tarball and type-check the README examples against it
 npm run build:docs     # dist-docs/: static docs site (relative paths, ready for GitHub Pages)
 ```
 
@@ -188,10 +192,7 @@ docs/
 
 Pages sit flat in the `docs/` root, so links inside partials always use `./`. The package name and version come from `package.json` via `%PKG_NAME%` and friends.
 
-CI checks pushes to `main` and `develop`, plus pull requests. CI and Pages share
-`.github/workflows/checks.yml`: lint, unit tests, dependency audit, browser tests,
-package validation, and the docs build must pass before the Pages artifact is uploaded.
-Pages deploys that validated artifact from `main` only, including manual runs.
+CI checks pushes to `main` and `develop`, plus pull requests. A `main` run checks the package once and deploys its docs artifact when that version exists on npm. If the run skips deployment, run **CI** on `main` after publishing. The docs use the package version for both npm and CDN examples.
 
 The development-only `minimatch` override selects v11 while ESLint still requests v10,
 to address [GHSA-g3hv-75wg-m249](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249).

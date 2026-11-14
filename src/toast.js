@@ -48,16 +48,12 @@ const DEFAULT_POSITION = 'top-right';
 // 關閉按鈕的無障礙名稱；非英語介面用 register({ closeLabel }) 換成在地語言
 const DEFAULT_CLOSE_LABEL = 'Close';
 
-// role + aria-live 等級 + glow ring RGB 後備值：
-//   role="alert"（隱含 assertive）僅給 error；其餘用 role="status"（隱含 polite），
-//   避免 role 與 aria-live 語意衝突。
-// ringRgb 後備供 jsdom / 極舊瀏覽器：getComputedStyle 不解析自訂屬性時（回空字串）
-// el.animate 仍要有色可用。
+// CSS 自訂屬性無值時，進場光暈使用同變體的 RGB 後備值。
 const VARIANTS = {
-  success: { role: 'status', live: 'polite',    ringRgb: '16, 185, 129' },
-  error:   { role: 'alert',  live: 'assertive', ringRgb: '239, 68, 68'  },
-  warning: { role: 'status', live: 'polite',    ringRgb: '245, 158, 11' },
-  info:    { role: 'status', live: 'polite',    ringRgb: '76, 112, 144' },
+  success: '16, 185, 129',
+  error: '239, 68, 68',
+  warning: '245, 158, 11',
+  info: '76, 112, 144',
 };
 
 const POSITION_CLASS = {
@@ -100,6 +96,53 @@ const prefersReducedMotion = () =>
 // --- 惰性容器快取 ---
 
 const containerMap = new Map();
+const toastState = new WeakMap();
+
+let announcers;
+
+function clearAnnouncements() {
+  for (const region of Object.values(announcers ?? {})) {
+    cancelAnimationFrame(region.frame);
+    region.frame = undefined;
+    region.pending.length = 0;
+    region.el.textContent = '';
+  }
+}
+
+function ensureAnnouncers() {
+  if (typeof document === 'undefined' || !document.body) return;
+  if (announcers?.status.el.isConnected && announcers.alert.el.isConnected) return;
+  clearAnnouncements();
+  for (const region of Object.values(announcers ?? {})) region.el.remove();
+  announcers = Object.fromEntries(['status', 'alert'].map((role) => {
+    const el = document.createElement('div');
+    el.className = 'glass-toast-announcer';
+    el.setAttribute('role', role);
+    el.setAttribute('aria-atomic', 'true');
+    document.body.appendChild(el);
+    return [role, { el, pending: [], frame: undefined }];
+  }));
+}
+
+function announce(toast, type, message) {
+  ensureAnnouncers();
+  const region = announcers[type === 'error' ? 'alert' : 'status'];
+  region.pending.push({ toast, message });
+  if (region.frame !== undefined) return;
+  // 先讓瀏覽器看到空區域，下一次繪製後才填文字。清空也讓相同訊息可再次宣告。
+  region.el.textContent = '';
+  region.frame = requestAnimationFrame(() => {
+    region.frame = requestAnimationFrame(() => {
+      region.frame = undefined;
+      const pending = region.pending.splice(0);
+      if (!region.el.isConnected) return;
+      region.el.textContent = pending
+        .filter(({ toast }) => toast.isConnected && !toast.dataset.dismissing)
+        .map(({ message }) => message)
+        .join('\n');
+    });
+  });
+}
 
 // dismissAll() 後鎖住新的 toast；頁面重載後 module 重建會自動歸零，
 // SPA 不重載時用 resume() 解鎖
@@ -124,7 +167,7 @@ function enforceCap(container) {
   const live = [...container.children].filter((c) => !c.dataset.dismissing);
   while (live.length >= MAX_VISIBLE_PER_POSITION) {
     const oldest = live.shift();
-    if (typeof oldest.__dismiss === 'function') oldest.__dismiss();
+    if (toastState.has(oldest)) toastState.get(oldest).dismiss();
     else oldest.remove();
   }
 }
@@ -135,23 +178,22 @@ function enforceCap(container) {
 function restoreFocus(invoker) {
   if (invoker && invoker.isConnected && typeof invoker.focus === 'function') {
     invoker.focus();
-    return;
+    if (document.activeElement === invoker) return;
   }
-  const nextBtn = document.querySelector('.glass-toast__close');
+  const nextBtn = document.querySelector(
+    '[data-toast-container] > .glass-toast:not([data-dismissing]) .glass-toast__close',
+  );
   if (nextBtn) nextBtn.focus();
 }
 
 // --- 建立 Toast DOM ---
 
 function createToastEl(message, { type, position, persistent, duration, action }) {
-  const variant = VARIANTS[type];
   const noMotion = prefersReducedMotion();
 
   // 外殼：毛玻璃 + 多層陰影；進場隱藏態 --enter 帶位移（軸向由 data-position
   // 決定）、reduced motion 用 --faded 純淡入
   const el = document.createElement('div');
-  el.setAttribute('role', variant.role);
-  el.setAttribute('aria-live', variant.live);
   el.dataset.position = position;
   el.className = [
     'glass-toast',
@@ -199,13 +241,6 @@ function createToastEl(message, { type, position, persistent, duration, action }
     bar.style.transition = `width ${duration}ms linear`;
 
     el.appendChild(bar);
-
-    // 下一幀啟動進度條動畫
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        bar.style.width = '0%';
-      });
-    });
   }
 
   return { el, btn, actionBtn };
@@ -224,12 +259,12 @@ function playGlowRing(el, type) {
   const styles = getComputedStyle(el);
   const ringRgb =
     styles.getPropertyValue('--gt-ring').trim().replace(/\s*,\s*/g, ', ') ||
-    VARIANTS[type].ringRgb;
+    VARIANTS[type];
   const baseShadow = styles.getPropertyValue('--gt-shadow').trim() || TOAST_BASE_SHADOW;
 
   // 用 blur radius 讓邊界羽化，spread 較小避免硬邊；起點亮終點淡
   // 中段 offset 0.35 維持近似亮度，營造「保留」感後再淡出
-  el.animate(
+  return el.animate(
     [
       { boxShadow: `0 0 18px 6px rgba(${ringRgb}, 0.75), ${baseShadow}`, offset: 0 },
       { boxShadow: `0 0 22px 8px rgba(${ringRgb}, 0.7), ${baseShadow}`,  offset: 0.35 },
@@ -242,28 +277,17 @@ function playGlowRing(el, type) {
 // --- Dismiss ---
 
 function removeAndCleanup(el, position) {
+  const container = el.parentElement;
   el.remove();
-  const container = containerMap.get(position);
   if (container && container.children.length === 0) {
     container.remove();
-    containerMap.delete(position);
+    if (containerMap.get(position) === container) containerMap.delete(position);
   }
 }
 
-function dismissToast(el, position, invoker) {
-  if (el.dataset.dismissing) return;
-  el.dataset.dismissing = 'true';
-
-  const finish = () => {
-    // 退場期間使用者可能已移走焦點，只交還移除當下仍在通知內的焦點。
-    const hadFocus = el.contains(document.activeElement);
-    removeAndCleanup(el, position);
-    if (hadFocus) restoreFocus(invoker);
-  };
-
+function animateExit(el) {
   if (prefersReducedMotion()) {
     el.classList.add('glass-toast--faded');
-    setTimeout(finish, TOAST_ANIM_MS);
     return;
   }
 
@@ -283,8 +307,6 @@ function dismissToast(el, position, invoker) {
   el.style.borderTopWidth = '0';
   el.style.borderBottomWidth = '0';
   el.style.marginTop = `-${TOAST_STACK_GAP_PX}px`;
-
-  setTimeout(finish, TOAST_ANIM_MS);
 }
 
 // --- 主入口 ---
@@ -305,8 +327,8 @@ export function show(message, options = {}) {
     action,
   } = options;
 
-  if (!VARIANTS[type]) type = DEFAULT_TYPE;
-  if (!POSITION_CLASS[position]) position = DEFAULT_POSITION;
+  if (!Object.hasOwn(VARIANTS, type)) type = DEFAULT_TYPE;
+  if (!Object.hasOwn(POSITION_CLASS, position)) position = DEFAULT_POSITION;
 
   // duration 未指定 → 變體預設（error 停留更久）
   const durationGiven = options.duration !== undefined;
@@ -329,19 +351,54 @@ export function show(message, options = {}) {
 
   container.appendChild(el);
 
+  const bar = el.querySelector('.glass-toast__bar');
+  let timerId;
+  let exitTimerId;
+  let frameId;
+  let progressFrameId;
+  let glow;
+  let removed = false;
+  const stop = () => {
+    clearTimeout(timerId);
+    cancelAnimationFrame(frameId);
+    cancelAnimationFrame(progressFrameId);
+    glow?.cancel();
+  };
+  const remove = () => {
+    if (removed) return;
+    removed = true;
+    stop();
+    clearTimeout(exitTimerId);
+    toastState.delete(el);
+    removeAndCleanup(el, position);
+  };
+  const dismiss = () => {
+    if (removed || el.dataset.dismissing) return;
+    if (!el.isConnected) { remove(); return; }
+    el.dataset.dismissing = 'true';
+    stop();
+    animateExit(el);
+    exitTimerId = setTimeout(() => {
+      // 使用者可能在 280ms 退場期間移走焦點。
+      const hadFocus = el.contains(document.activeElement);
+      remove();
+      if (hadFocus) restoreFocus(invoker);
+    }, TOAST_ANIM_MS);
+  };
+  toastState.set(el, { dismiss, remove, invoker });
+  announce(el, type, message);
+
   // 觸發進場動畫（reduced motion 時僅淡入，不位移）
   // double RAF：第一幀讓 initial state（--enter / --faded）被瀏覽器 commit，
   // 第二幀 remove class 才會觸發 transition；single RAF 在某些時序下會直接跳到終態
   const enterClass = prefersReducedMotion() ? 'glass-toast--faded' : 'glass-toast--enter';
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
+  frameId = requestAnimationFrame(() => {
+    frameId = requestAnimationFrame(() => {
+      if (!el.isConnected) { remove(); return; }
       el.classList.remove(enterClass);
-      playGlowRing(el, type);
+      glow = playGlowRing(el, type);
     });
   });
-
-  const dismiss = () => dismissToast(el, position, invoker);
-  el.__dismiss = dismiss; // 供 enforceCap 關掉最舊 toast
 
   // 關閉按鈕
   btn.addEventListener('click', dismiss);
@@ -362,40 +419,41 @@ export function show(message, options = {}) {
     }
   });
 
-  // 自動消失 + 暫停（hover 與鍵盤焦點皆暫停，含進度條同步；WCAG 2.2.1）
+  // 自動消失 + 暫停（hover 與鍵盤焦點皆暫停，含進度條同步）
   if (!persistent) {
-    const bar = el.querySelector('.glass-toast__bar');
     let remaining = duration;
     let startTime = Date.now();
-    let timerId = setTimeout(dismiss, remaining);
+    timerId = setTimeout(dismiss, remaining);
     let paused = false;
     let hovered = false;
     let focused = false;
 
+    const startProgress = () => {
+      bar.style.transition = `width ${remaining}ms linear`;
+      bar.style.width = '0%';
+    };
+    progressFrameId = requestAnimationFrame(() => {
+      progressFrameId = requestAnimationFrame(startProgress);
+    });
+
     const pause = () => {
-      if (paused) return;
+      if (paused || removed || el.dataset.dismissing) return;
       paused = true;
       clearTimeout(timerId);
+      cancelAnimationFrame(progressFrameId);
       remaining -= Date.now() - startTime;
-      if (bar) {
-        const currentWidth = bar.getBoundingClientRect().width;
-        bar.style.transition = 'none';
-        bar.style.width = `${currentWidth}px`;
-      }
+      const currentWidth = bar.getBoundingClientRect().width;
+      bar.style.transition = 'none';
+      bar.style.width = `${currentWidth}px`;
     };
 
     const resumeTimer = () => {
-      if (!paused) return;
+      if (!paused || removed || el.dataset.dismissing) return;
       paused = false;
       if (remaining <= 0) { dismiss(); return; }
       startTime = Date.now();
       timerId = setTimeout(dismiss, remaining);
-      if (bar) {
-        requestAnimationFrame(() => {
-          bar.style.transition = `width ${remaining}ms linear`;
-          bar.style.width = '0%';
-        });
-      }
+      progressFrameId = requestAnimationFrame(startProgress);
     };
 
     // 只有 hover 與焦點都離開才恢復倒數
@@ -423,10 +481,18 @@ export function show(message, options = {}) {
  */
 export function dismissAll({ suppress = false } = {}) {
   if (suppress) suppressed = true;
+  clearAnnouncements();
+  let focusedState;
   for (const container of containerMap.values()) {
+    for (const toast of [...container.children]) {
+      const state = toastState.get(toast);
+      if (toast.contains(document.activeElement)) focusedState = state;
+      state?.remove();
+    }
     container.remove();
   }
   containerMap.clear();
+  if (focusedState) restoreFocus(focusedState.invoker);
 }
 
 /** 解除 dismissAll() 造成的 show() 靜音鎖 */
@@ -465,6 +531,7 @@ export function register({ global = true, injectStyles = true, target, closeLabe
   autoInjectStyles = injectStyles;
   closeLabel = typeof label === 'string' && label.trim() ? label : DEFAULT_CLOSE_LABEL;
   if (injectStyles) ensureStyles();
+  ensureAnnouncers();
   if (global) {
     const t = target ?? (typeof window !== 'undefined' ? window : undefined);
     if (t) t.toast = api;

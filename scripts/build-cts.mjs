@@ -4,7 +4,7 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 const dist = new URL('../dist/', import.meta.url);
-const files = readdirSync(dist).filter((name) => name.endsWith('.d.ts'));
+const files = readdirSync(dist).filter((name) => name.endsWith('.d.ts') && !name.endsWith('.css.d.ts'));
 
 for (const name of files) {
   const source = readFileSync(new URL(name, dist), 'utf8');

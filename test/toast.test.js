@@ -16,6 +16,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.useRealTimers();
   if (originalAnimate) Element.prototype.animate = originalAnimate;
   else delete Element.prototype.animate;
@@ -26,14 +27,12 @@ async function loadToast() {
 }
 
 describe('show', () => {
-  it('建立 toast 並加入 DOM，含正確 role 和 aria-live', async () => {
+  it('建立可操作的 toast 並顯示訊息', async () => {
     const { show } = await loadToast();
     show('測試訊息', { type: 'info' });
 
     const toast = document.querySelector('.glass-toast');
     expect(toast).not.toBeNull();
-    expect(toast.getAttribute('role')).toBe('status'); // 非 error 用 status（隱含 polite）
-    expect(toast.getAttribute('aria-live')).toBe('polite');
     expect(toast.textContent).toContain('測試訊息');
   });
 
@@ -66,15 +65,6 @@ describe('type variants', () => {
     const pill = toast.querySelector('.glass-toast__icon');
     expect(pill).not.toBeNull();
     expect(pill.querySelector('svg')).not.toBeNull();
-  });
-
-  it('error 類型 role=alert 且 aria-live=assertive', async () => {
-    const { show } = await loadToast();
-    show('err', { type: 'error' });
-
-    const toast = document.querySelector('.glass-toast');
-    expect(toast.getAttribute('role')).toBe('alert');
-    expect(toast.getAttribute('aria-live')).toBe('assertive');
   });
 
   it('未知 type 退回 info', async () => {
@@ -482,6 +472,31 @@ describe('styles injection', () => {
 });
 
 describe('dismissAll', () => {
+  it('取消仍在倒數或退場的通知，並交還原本在通知內的焦點', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'requestAnimationFrame', 'cancelAnimationFrame'] });
+    const schedule = vi.spyOn(globalThis, 'setTimeout');
+    const cancel = vi.spyOn(globalThis, 'clearTimeout');
+    const { show, dismissAll } = await loadToast();
+    const invoker = document.createElement('button');
+    document.body.append(invoker);
+    invoker.focus();
+    const dismiss = show('leaving', { duration: 40000 });
+    show('pending', { position: 'bottom-right', duration: 30000 });
+    document.querySelector('.glass-toast__close').focus();
+    dismiss();
+    dismissAll();
+
+    expect(document.activeElement).toBe(invoker);
+    for (const delay of [40000, 30000, 280]) {
+      const index = schedule.mock.calls.findIndex(([, ms]) => ms === delay);
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect(cancel).toHaveBeenCalledWith(schedule.mock.results[index].value);
+    }
+    const pending = vi.getTimerCount();
+    dismiss();
+    expect(vi.getTimerCount()).toBe(pending);
+  });
+
   it('移除所有 toast 容器與元素', async () => {
     const { show, dismissAll } = await loadToast();
     show('a', { position: 'top-right', persistent: true });
@@ -540,13 +555,42 @@ describe('dismissAll', () => {
   });
 });
 
-describe('aria role per variant', () => {
-  it.each([['success'], ['warning'], ['info']])('%s 用 role=status（隱含 polite）', async (type) => {
-    const { show } = await loadToast();
-    show('x', { type, persistent: true });
+describe('通知朗讀區域', () => {
+  it('先建立兩個空區域，再按優先順序更新文字，視覺通知不重複宣告', async () => {
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] });
+    const { register, show } = await loadToast();
+    register({ global: false });
+    const status = document.querySelector('[role="status"]');
+    const alert = document.querySelector('[role="alert"]');
+    expect(status.textContent).toBe('');
+    expect(alert.textContent).toBe('');
 
-    const toast = document.querySelector('.glass-toast');
-    expect(toast.getAttribute('role')).toBe('status');
+    show('已儲存', { type: 'success', persistent: true });
+    show('已同步', { type: 'info', persistent: true });
+    show('連線失敗', { type: 'error', persistent: true });
+    expect(status.textContent).toBe('');
+    expect(alert.textContent).toBe('');
+    vi.advanceTimersByTime(40);
+
+    expect(status.textContent).toBe('已儲存\n已同步');
+    expect(alert.textContent).toBe('連線失敗');
+    expect(document.querySelector('.glass-toast[role], .glass-toast[aria-live]')).toBeNull();
+  });
+
+  it('具名 API 在 SPA 更換 body 後重建區域，清空時取消尚未宣告的訊息', async () => {
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] });
+    const { show, dismissAll } = await loadToast();
+    show('舊頁面', { persistent: true });
+    document.body.replaceChildren();
+    show('新頁面', { persistent: true });
+    vi.advanceTimersByTime(40);
+    const status = document.querySelector('[role="status"]');
+    expect(status.textContent).toBe('新頁面');
+
+    show('不再宣告', { persistent: true });
+    dismissAll();
+    vi.advanceTimersByTime(40);
+    expect(status.textContent).toBe('');
   });
 });
 
@@ -618,6 +662,14 @@ describe('duration defaults', () => {
 });
 
 describe('max visible cap', () => {
+  it('淘汰最舊通知時取消其原有的倒數', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const { show } = await loadToast();
+    for (let i = 0; i < 5; i++) show(`t${i}`, { duration: 40000 });
+    vi.advanceTimersByTime(280);
+    expect(vi.getTimerCount()).toBe(4);
+  });
+
   it('同位置超過上限（4）時自動關掉最舊的 toast', async () => {
     vi.useFakeTimers();
     const { show } = await loadToast();

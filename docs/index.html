@@ -212,7 +212,7 @@
 
           <section class="doc" id="install">
             <h3>安裝</h3>
-            <pre class="code" data-lang="sh"><code>npm install %PKG_NAME%</code></pre>
+            <pre class="code" data-lang="sh"><code>npm install %PKG_SPEC%</code></pre>
             <p>套件內含型別宣告，TypeScript 專案不需要另外安裝 <code>@types</code>。沒有建置工具的頁面也可以直接從 CDN 載入，見下方的 <a href="#usage">&lt;script&gt; 引入</a>。</p>
           </section>
 
@@ -244,7 +244,7 @@ success('儲存成功'); // 第一次呼叫時自動注入樣式
 show('自訂', { type: 'warning', duration: 8000 });</code></pre>
 
             <h4><code>&lt;script&gt;</code> 引入（UMD，全域 <code>GlassToast</code>）</h4>
-            <pre class="code" data-lang="html"><code>&lt;script src="https://unpkg.com/%PKG_NAME%"&gt;&lt;/script&gt;
+            <pre class="code" data-lang="html"><code>&lt;script src="https://unpkg.com/%PKG_SPEC%"&gt;&lt;/script&gt;
 &lt;script&gt;
   GlassToast.register(); // 掛 window.toast + 注入樣式
   toast.info('哈囉');
@@ -496,15 +496,16 @@ toast.info('哈囉');</code></pre>
               <table>
                 <thead><tr><th>變體</th><th><code>role</code></th><th><code>aria-live</code></th></tr></thead>
                 <tbody>
-                  <tr><td><code>error</code></td><td><code>alert</code></td><td><code>assertive</code>：立即打斷朗讀</td></tr>
-                  <tr><td><code>success</code> / <code>warning</code> / <code>info</code></td><td><code>status</code></td><td><code>polite</code>：等目前朗讀結束</td></tr>
+                  <tr><td><code>error</code></td><td><code>alert</code></td><td><code>assertive</code>：提示輔助技術優先宣告</td></tr>
+                  <tr><td><code>success</code> / <code>warning</code> / <code>info</code></td><td><code>status</code></td><td><code>polite</code>：提示輔助技術在合適時機宣告</td></tr>
                 </tbody>
               </table>
             </div>
+            <p>訊息會寫入預先建立的朗讀區域。畫面上的通知保留可操作的按鈕，朗讀區域只包含訊息文字。</p>
             <ul>
-              <li>滑鼠移上或鍵盤焦點進入時暫停倒數（倒數條同步停住），兩者都離開才恢復，符合 WCAG 2.2.1。</li>
+              <li>滑鼠移上或鍵盤焦點進入時暫停倒數，兩者都離開才恢復。若通知是取得重要訊息或執行操作的唯一方式，請使用 <code>persistent: true</code>，或在頁面上提供可隨時查看的內容或操作。參考 <a href="https://www.w3.org/WAI/WCAG22/Understanding/timing-adjustable.html">WCAG 2.2.1 計時可調整</a>。</li>
               <li>焦點在通知內時按 <kbd>Esc</kbd> 關閉該則；不攔截頁面其他地方的 <kbd>Esc</kbd>。</li>
-              <li>通知關閉時若焦點還在裡面，焦點會交還給觸發它的元素；觸發者已不在頁面上時，移到其他通知的關閉鈕，不會掉回頁首。</li>
+              <li>關閉單則或清空所有通知時，若焦點還在通知內，會嘗試交還給仍可聚焦的觸發元素。關閉單則時，也可交給其他仍可操作的通知關閉鈕。</li>
               <li>圖示為 <code>aria-hidden</code>，與藥丸底的對比至少 3:1。關閉鈕的 <code>aria-label</code> 預設為 <code>Close</code>，非英語介面用 <a href="#api-register"><code>register({ closeLabel })</code></a> 換成在地語言。</li>
             </ul>
           </section>

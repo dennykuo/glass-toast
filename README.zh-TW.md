@@ -2,12 +2,14 @@
 
 [English](README.md) | **繁體中文**
 
+[文件站](https://dennykuo.github.io/glass-toast/) · [互動 Demo](https://dennykuo.github.io/glass-toast/demo.html)
+
 毛玻璃質感的 toast 通知元件 — vanilla JS、零 runtime 相依、不需要 Tailwind 或任何框架，開箱即用。
 
 - 4 種變體（success / error / warning / info）：彩色圖示藥丸 + 進場 glow ring 脈衝 + 倒數進度條
 - 3 個位置（top-right / bottom-right / bottom-center），各自獨立堆疊容器
 - 毛玻璃外殼（backdrop-filter + 多層陰影），dismiss 時堆疊平滑坍縮回流
-- hover **與鍵盤焦點**皆暫停自動消失（含進度條同步暫停）；`Esc` 關閉聚焦中的 toast、關閉後焦點交還觸發者（WCAG 2.2.1）
+- 滑鼠移上或鍵盤焦點進入時暫停倒數，按 `Esc` 可關閉聚焦中的通知。
 - 內建 dark 外觀（**深色毛玻璃 + 淺字**，保留玻璃身分、避免夜間眩光），自動命中 `prefers-color-scheme` / `[data-theme="dark"]` / `.dark` 三種慣例
 - `prefers-reduced-motion` 完整降級（純淡入、無位移、無 glow；倒數進度條保留，仍提供時間指示）
 - a11y：`role="status"`（一般）/ `role="alert"`（error）+ 對應 `aria-live`（error 為 assertive，其餘 polite），圖示對藥丸底達 ≥3:1 對比；關閉按鈕名稱可用 `closeLabel` 在地化
@@ -17,7 +19,7 @@
 ## 安裝
 
 ```bash
-npm install @dennykuo/glass-toast
+npm install @dennykuo/glass-toast@0.1.1
 ```
 
 ## 快速開始
@@ -56,7 +58,7 @@ success('儲存成功');
 ### 3. `<script>` 直接引入（UMD，全域 `GlassToast`）
 
 ```html
-<script src="https://unpkg.com/@dennykuo/glass-toast"></script>
+<script src="https://unpkg.com/@dennykuo/glass-toast@0.1.1"></script>
 <script>
   GlassToast.register(); // 掛 window.toast + 注入樣式
   toast.info('哈囉');
@@ -150,6 +152,8 @@ dark 覆寫全部走 `:where()` 壓成與 base 相同的 specificity，你的覆
 
 ## CSP / SSR 註記
 
+若通知是取得重要訊息或執行操作的唯一方式，請使用 `persistent: true`，或另外提供可在通知關閉後使用的管道。參考 [WCAG 2.2.1 計時可調整](https://www.w3.org/WAI/WCAG22/Understanding/timing-adjustable.html)。
+
 - 嚴格 CSP（禁 inline `<style>`）：改顯式 `import '@dennykuo/glass-toast/style.css'` + `register({ injectStyles: false })`
 - 已自行載入 style.css 且想避免重複注入：在你的 `<link>` / `<style>` 加 `data-glass-toast` 屬性即可被偵測跳過
 - SSR：所有入口在無 `document` 環境安全 no-op，`show()` 請在 client 端呼叫
@@ -166,7 +170,7 @@ npm test            # vitest + jsdom（含文件覆蓋率守門）
 npm run test:browser # Chromium、Firefox、WebKit，涵蓋桌機與手機寬度
 npm run lint        # ESLint，含文件站腳本
 npm run build       # dist/：ESM + UMD + CSS + .d.ts / .d.cts
-npm run check:package  # publint + attw：確認 exports 與 ESM / CJS 型別都正確（prepublishOnly 會自動跑）
+npm run check:package  # 檢查 tarball 並用乾淨安裝驗證 README 範例型別
 npm run build:docs  # dist-docs/：文件站靜態檔（相對路徑，可直接部署到 GitHub Pages）
 ```
 
@@ -188,10 +192,7 @@ docs/
 
 頁面一律平放在 `docs/` 根目錄，partial 裡的站內連結都寫 `./`；套件名稱與版本以 `%PKG_NAME%` 等從 `package.json` 帶入。
 
-CI 檢查 `main`、`develop` 的 push 與所有 PR。CI 和 Pages 共用
-`.github/workflows/checks.yml`；lint、單元測試、依賴掃描、瀏覽器測試、套件檢查與
-文件站建置全部成功後，才會上傳 Pages 產物。Pages 僅部署該次驗證的 `main` 產物，
-手動執行也適用同一限制。
+CI 檢查 `main`、`develop` 的推送和 PR。`main` 每次只跑一輪驗證，該版本已在 npm 發布時會部署同次驗證的文件站。若因版本未發布而略過部署，發布後可在 `main` 手動執行 **CI**。文件站的 npm 和 CDN 範例使用同一個套件版本。
 
 開發依賴暫以 `minimatch` override 選用 v11，處理 ESLint 仍要求 v10 時的
 [GHSA-g3hv-75wg-m249](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249)。

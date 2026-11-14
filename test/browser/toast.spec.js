@@ -105,3 +105,27 @@ for (const reducedMotion of ['no-preference', 'reduce']) {
     await expect(page.locator('#other')).toBeFocused();
   });
 }
+
+test('320px 下長操作文字、訊息與關閉鈕都放得下', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  await load(page, 'light');
+  await page.evaluate(() => {
+    window.GlassToast.show('狹窄畫面中的訊息仍應清楚可見', {
+      action: { label: '重新檢查連線並再次上傳檔案', onClick() {} },
+    });
+  });
+  const toast = page.locator('.glass-toast');
+  await expect(toast).toHaveCSS('opacity', '1');
+  const shell = await toast.boundingBox();
+  const message = await toast.getByText('狹窄畫面中的訊息仍應清楚可見').boundingBox();
+  expect(message.width).toBeGreaterThan(100);
+  for (const button of await toast.getByRole('button').all()) {
+    const bounds = await button.boundingBox();
+    expect(bounds.x).toBeGreaterThanOrEqual(shell.x);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(shell.x + shell.width);
+  }
+  const close = toast.getByRole('button', { name: 'Close', exact: true });
+  expect(await contrast(close)).toBeGreaterThanOrEqual(3);
+  await close.click();
+  await expect(toast).toHaveCount(0);
+});

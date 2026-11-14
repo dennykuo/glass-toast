@@ -1,6 +1,6 @@
 # glass-toast 後續工作清單
 
-更新日期：2026-11-14（Asia/Taipei）。五項修正、品質檢查與首載 404 修正已在本機驗證。
+更新日期：2026-11-14（Asia/Taipei）。文件站已上線，`0.1.1` 的追加修正已在本機驗證。
 
 本清單接續 Polyscope 副本的 `.context/next-steps.md`，供原專案後續開發使用。
 歷史紀錄仍保留在原副本；以下狀態以本次核對為準。
@@ -9,8 +9,10 @@
 
 - 本輪變更接續 `develop` 上從 Polyscope 恢復的 8 個提交。
 - 每筆推送的驗證結果見 [develop 的 GitHub Actions](https://github.com/dennykuo/glass-toast/actions?query=branch%3Adevelop)。
-- 套件版本仍為 `0.1.0`，尚未準備或發佈 `0.1.1`。
-- GitHub Pages 最近核對為未啟用；本次未合併、部署或發佈套件。
+- 本機待發布版本為 `0.1.1`，npm 上的 `latest` 仍為 `0.1.0`。
+- `0.1.1` 準備變更已收錄於本機 `develop` 和 `main`，待推送。
+- 目前正式文件站的部署提交為 `d9b5e12`。
+- [GitHub Pages 文件站](https://dennykuo.github.io/glass-toast/) 已上線，發布來源為 GitHub Actions。
 
 ## 本輪五項已完成
 
@@ -31,10 +33,10 @@
   新增的兩個交錯操作測試會失敗；修正前的 84 個測試無法抓到此變異。
 
 - [x] **對齊 develop 的 CI 與 Pages 部署門檻。**
-  `main`、`develop` 的 push 與 PR 呼叫共用的 `.github/workflows/checks.yml`。
+  `main`、`develop` 的 push 與 PR 都由 CI 呼叫 `.github/workflows/checks.yml`。
   lint、單元測試、依賴掃描、Chromium／Firefox／WebKit 測試、套件檢查及文件站建置都成功，
   才會上傳 Pages 產物；部署 job 依賴整個檢查完成，使用同次驗證的產物。
-  手動執行亦僅允許 `main` 部署。Node 版本集中於 `.nvmrc`（24），
+  每次 `main` 只跑一次共用檢查，確認 npm 已有該版本才部署。手動執行也只允許 `main` 部署。Node 版本集中於 `.nvmrc`（24），
   `engines.node` 與工具需求對齊為 `^22.13.0 || >=24.0.0`。
   workflow 通過 actionlint。GitHub 上的結果以各次工作流程執行紀錄為準。
 
@@ -83,30 +85,32 @@ ESLint 10 的依賴仍要求 Minimatch 10；
   六組驗證均可觸控關閉與重試，錯誤通知不移走目前焦點，Esc 關閉後交還觸發按鈕。
   一般、錯誤通知分別檢查 `status/polite` 和 `alert/assertive`。
   macOS Safari 開啟 VoiceOver 時，通知文字及「重試」「關閉通知」可在無障礙樹中讀取，且重試可執行。
-- [ ] 確認螢幕閱讀器實際朗讀一般通知及錯誤通知。這次未取得 macOS VoiceOver 的朗讀內容。
+- [ ] 確認螢幕閱讀器實際朗讀一般通知及錯誤通知。已改用預先建立的朗讀區域，並重新確認 Safari 無障礙樹有通知文字及操作按鈕。這次未取得 macOS VoiceOver 的朗讀內容。
 - [ ] 用 iPhone／Android 實機確認通知的觸控、重試、關閉和朗讀（VoiceOver／TalkBack）。
   本次環境未偵測到可用的手機。
 
 ## 後續上線工作
 
-1. [ ] 確認 `develop` 對應提交的 CI 通過後，依既定流程合併至 `main`。
-2. [ ] 啟用 GitHub Pages（Source: GitHub Actions），確認線上 workflow 與站台成功。
-3. [ ] 上線後更新 `package.json` 的 `homepage` 與兩份 README 的文件入口。
-   預期網址 `https://dennykuo.github.io/glass-toast/`，需先驗證再採用。
-4. [ ] 準備 `0.1.1` 版本與 CHANGELOG，檢查最終 npm 封裝及型別。
-5. [ ] 依舊清單由使用者執行 `npm publish`，再驗證 npm／CDN 實際安裝與載入。
+1. [x] 確認 `develop` 對應提交的 CI 通過後，快轉合併至 `main`；[main CI](https://github.com/dennykuo/glass-toast/actions/runs/43583615857) 通過。
+2. [x] 啟用 GitHub Pages，[Docs 工作流程](https://github.com/dennykuo/glass-toast/actions/runs/43583615849) 部署成功。
+   正式首頁與 Demo 回傳 200，Chromium 桌面和 WebKit 390px 均通過資源載入、深色跨頁保留及「重試」操作。
+3. [x] `package.json` 的 `homepage` 已指向 GitHub Pages，英文與繁中 README 均已加入文件站與互動 Demo 連結。
+4. [x] 準備 `0.1.1` 版本與 CHANGELOG，檢查最終 npm 封裝及型別。
+5. [ ] 依舊清單由使用者執行 `npm publish`，再驗證 npm／CDN 實際安裝與載入。若 `main` 的 CI 已因版本未發布略過部署，發布後在 `main` 手動執行 CI，確認線上文件版號、安裝與 CDN 範例一致。
 
 ## 本輪驗證紀錄
 
 - Node 24.10.0；以 `npm ci --ignore-scripts` 乾淨重裝成功，lockfile 雜湊未變。
   本次亦使用 Node 22.13.0 驗證最低支援版本，CI 目前使用 Node 24。
 - `npm test`：5 個測試檔、90 個測試通過；`npm run lint` 通過。
-- `npm run test:browser`：先建置套件，54 項跨瀏覽器測試通過（桌機 1440px、手機 390px）。
+- `npm run test:browser`：先建置套件，60 項跨瀏覽器測試通過，含 320px 的長操作文字與關閉圖示對比。
   對比測試等待 hover transition 完成後才量測，避免只讀到變色前的一幀。
 - `npm run build:docs`、`npm run check:package` 通過；actionlint v1.7.12 通過。
 - `npm audit --audit-level=moderate` 與乾淨安裝時的掃描均為 0 項。
-- `npm pack --dry-run --json`：17 個檔案，約 20.1KB 壓縮、62.7KB 解壓；
-  未包含測試、原始碼或開發依賴檔案。
+- `0.1.1` tarball 含編譯產物、JavaScript 與 CSS 入口的型別、套件資訊、兩份 README、CHANGELOG 及授權。
+- 對 tarball 執行 publint 與 attw，另從暫存消費專案驗證 Node 22.13.0 的 ESM／CommonJS 載入、
+  TypeScript 5.9 的 Node 與 bundler 模式，以及封裝內瀏覽器 ESM／UMD 與 CSS 的通知顯示和關閉。
+  CI 的 `check:package` 會安裝當次 tarball，開啟 `noUncheckedSideEffectImports` 編譯兩份 README 的 CSS 匯入範例。
 - 建置後文件／Demo 以 `/glass-toast/` 子路徑提供，在 320／390／768／1440px
   均無水平溢出；深色／背景選擇跨頁保留，未觀察到 JavaScript 錯誤或失敗資源請求。
 - attw 沿用原有例外：略過 node10、排除 CSS 入口，忽略 `cjs-resolves-to-esm`。

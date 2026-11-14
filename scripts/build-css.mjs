@@ -15,4 +15,5 @@ const { code } = transform({
 
 mkdirSync(outDir, { recursive: true });
 writeFileSync(out, code);
+writeFileSync(new URL('glass-toast.css.d.ts', outDir), 'export {};\n');
 console.log(`dist/glass-toast.css — ${code.length} bytes`);

@@ -1,6 +1,6 @@
 {
   "name": "@dennykuo/glass-toast",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Zero-dependency glassmorphism toast notifications — vanilla JS, framework-free, Tailwind-free. 毛玻璃質感 toast 通知，零相依開箱即用。",
   "type": "module",
   "license": "MIT",
@@ -9,7 +9,7 @@
     "type": "git",
     "url": "git+https://github.com/dennykuo/glass-toast.git"
   },
-  "homepage": "https://github.com/dennykuo/glass-toast#readme",
+  "homepage": "https://dennykuo.github.io/glass-toast/",
   "bugs": {
     "url": "https://github.com/dennykuo/glass-toast/issues"
   },
@@ -51,13 +51,17 @@
       "import": "./dist/auto.js",
       "default": "./dist/auto.js"
     },
-    "./style.css": "./dist/glass-toast.css",
+    "./style.css": {
+      "types": "./dist/glass-toast.css.d.ts",
+      "default": "./dist/glass-toast.css"
+    },
     "./package.json": "./package.json"
   },
   "files": [
     "dist",
     "README.md",
     "README.zh-TW.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {
@@ -68,7 +72,7 @@
     "test:browser": "npm run build && playwright test",
     "test:watch": "vitest",
     "lint": "eslint src test scripts docs",
-    "check:package": "publint --strict && attw --pack . --profile node16 --exclude-entrypoints ./style.css --ignore-rules cjs-resolves-to-esm",
+    "check:package": "node scripts/check-package.mjs",
     "prepublishOnly": "npm run build && npm run check:package"
   },
   "engines": {

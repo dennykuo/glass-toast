@@ -20,6 +20,15 @@
 
 /* --- 容器（惰性建立，per position） --- */
 
+.glass-toast-announcer {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
 .glass-toast-container {
     position: fixed;
     display: flex;
@@ -62,7 +71,7 @@
     --gt-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
     --gt-close-bg: #f9fafb;                    /* gray-50 */
     --gt-close-border: #e5e7eb;                /* gray-200 */
-    --gt-close-text: #99a1af;                  /* gray-400 */
+    --gt-close-text: #667085;                  /* 讓關閉圖示相對於淺底達到 3:1 */
     --gt-close-bg-hover: #f3f4f6;              /* gray-100 */
     --gt-close-border-hover: #d1d5dc;          /* gray-300 */
     --gt-close-text-hover: #4a5565;            /* gray-600 */
@@ -70,7 +79,8 @@
 
     pointer-events: auto;
     position: relative;
-    display: flex;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 0.75rem;
     width: 24rem;
@@ -173,7 +183,6 @@
 /* --- 訊息文字 --- */
 
 .glass-toast__message {
-    flex: 1 1 0%;
     min-width: 0;             /* 允許 flex 子項收縮，長字串不撐破容器 */
     margin: 0;
     font-size: 0.9375rem; /* 15px */
@@ -190,7 +199,12 @@
 /* --- Action 按鈕（可選；渲染在訊息與關閉鈕之間，取變體色） --- */
 
 .glass-toast__action {
-    flex-shrink: 0;
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: start;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 2rem;
     align-self: center;
     padding: 0.3125rem 0.75rem;
     border: 1px solid var(--gt-action-border, var(--gt-border));
@@ -200,8 +214,8 @@
     font: inherit;
     font-size: 0.8125rem;
     font-weight: 600;
-    line-height: 1;
-    white-space: nowrap;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
     cursor: pointer;
     appearance: none;
     transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
@@ -220,7 +234,8 @@
 /* --- 關閉按鈕：in-flow、靠右、圓形帶圈（flex align-items 垂直置中） --- */
 
 .glass-toast__close {
-    flex-shrink: 0;
+    grid-column: -2;
+    grid-row: 1;
     align-self: center;
     display: flex;
     align-items: center;
@@ -272,6 +287,15 @@
 @media (min-width: 768px) {
     .glass-toast__message {
         font-size: 14px;
+    }
+
+    .glass-toast:has(.glass-toast__action) {
+        grid-template-columns: auto minmax(0, 1fr) minmax(0, 35%) auto;
+    }
+
+    .glass-toast:has(.glass-toast__action) .glass-toast__action {
+        grid-column: 3;
+        grid-row: 1;
     }
 }
 

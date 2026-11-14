@@ -19,6 +19,7 @@ const PAGES = ['index', 'demo'];
 // 套件後設資料統一來自 package.json，HTML 以 Vite 內建的 %KEY% 語法取用
 const SITE_ENV = {
   PKG_NAME: pkg.name,
+  PKG_SPEC: `${pkg.name}@${pkg.version}`,
   PKG_SHORT_NAME: pkg.name.split('/').pop(),
   PKG_VERSION: pkg.version,
   PKG_LICENSE: pkg.license,
