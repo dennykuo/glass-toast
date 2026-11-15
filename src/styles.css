@@ -49,6 +49,10 @@
     pointer-events: none;
 }
 
+.glass-toast-container[data-scrollable] {
+    pointer-events: auto;
+}
+
 .glass-toast-container--top-right {
     top: 0;
     right: 0;

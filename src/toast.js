@@ -99,6 +99,7 @@ const prefersReducedMotion = () =>
 
 const scopes = new Map();
 const toastState = new WeakMap();
+const stackObservers = new WeakMap();
 
 function getScope(root) {
   for (const [previousRoot, scope] of scopes) {
@@ -164,11 +165,22 @@ function announce(scope, toast, type, message) {
 // SPA 不重載時用 resume() 解鎖
 let suppressed = false;
 
+function updateStackScroll(container) {
+  // 有溢位時，滾輪或觸控在通知間的留白也能捲動整個堆疊。
+  container.toggleAttribute('data-scrollable', container.scrollHeight > container.clientHeight);
+}
+
+function removeContainer(container) {
+  stackObservers.get(container)?.disconnect();
+  container.remove();
+}
+
 function getContainer({ root, containers }, position) {
   // SPA 換頁（如 Astro ViewTransitions）會替換 body 內容，cached container
   // 會被卸下；用 isConnected 判斷後重建
   const cached = containers.get(position);
   if (cached && cached.isConnected) return cached;
+  if (cached) removeContainer(cached);
 
   const el = document.createElement('div');
   el.className = `glass-toast-container ${POSITION_CLASS[position]}`;
@@ -177,6 +189,11 @@ function getContainer({ root, containers }, position) {
   el.tabIndex = -1;
   root.appendChild(el);
   containers.set(position, el);
+  if (typeof ResizeObserver === 'function') {
+    const observer = new ResizeObserver(() => updateStackScroll(el));
+    observer.observe(el);
+    stackObservers.set(el, observer);
+  }
   return el;
 }
 
@@ -298,8 +315,10 @@ function removeAndCleanup(el, containers, position) {
   const container = el.parentElement;
   el.remove();
   if (container && container.children.length === 0) {
-    container.remove();
+    removeContainer(container);
     if (containers.get(position) === container) containers.delete(position);
+  } else if (container) {
+    updateStackScroll(container);
   }
 }
 
@@ -374,6 +393,7 @@ export function show(message, options = {}) {
   const followLatest = !container.contains(invoker)
     && container.scrollHeight - container.clientHeight - container.scrollTop <= 1;
   container.appendChild(el);
+  updateStackScroll(container);
   if (followLatest) container.scrollTop = container.scrollHeight;
 
   const bar = el.querySelector('.glass-toast__bar');
@@ -529,7 +549,7 @@ function clearScope({ announcers, containers }) {
       if (toast.contains(document.activeElement)) focusedState = state;
       state?.remove();
     }
-    container.remove();
+    removeContainer(container);
   }
   containers.clear();
   return focusedState;

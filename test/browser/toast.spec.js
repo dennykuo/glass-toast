@@ -196,9 +196,12 @@ test('短螢幕的置底堆疊讓最新通知可操作，較早通知仍能捲�
   const stack = page.locator('[data-toast-container="bottom-center"]');
   await expect(stack).toBeInViewport({ ratio: 1 });
   await expect(close(4)).toBeInViewport({ ratio: 1 });
-  await close(4).hover();
-  await page.mouse.wheel(0, -1000);
-  await expect(close(1)).toBeInViewport({ ratio: 1 });
+  const bounds = await stack.boundingBox();
+  await page.mouse.move(bounds.x + 4, bounds.y + bounds.height / 2);
+  await expect(async () => {
+    await page.mouse.wheel(0, -1000);
+    await expect(close(1)).toBeInViewport({ ratio: 1, timeout: 700 });
+  }).toPass({ timeout: 5000 });
   await close(1).focus();
   await page.keyboard.press('Escape');
   await expect(close(1)).toHaveCount(0);
