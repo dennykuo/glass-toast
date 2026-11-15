@@ -27,6 +27,67 @@ async function loadToast() {
 }
 
 describe('show', () => {
+  it.each([NaN, Infinity, -Infinity])('非有限 duration %s 回到變體預設', async (duration) => {
+    vi.useFakeTimers();
+    const { error } = await loadToast();
+    error('Invalid duration', { duration });
+    vi.advanceTimersByTime(9999);
+    expect(document.querySelector('.glass-toast')).not.toBeNull();
+    vi.advanceTimersByTime(500);
+    expect(document.querySelector('.glass-toast')).toBeNull();
+  });
+
+  it('超過瀏覽器計時器上限的 duration 不會立即消失', async () => {
+    vi.useFakeTimers();
+    const { show } = await loadToast();
+    show('Long duration', { duration: 30 * 24 * 60 * 60 * 1000 });
+    vi.advanceTimersByTime(1000);
+    expect(document.querySelector('.glass-toast')).not.toBeNull();
+    vi.advanceTimersByTime(2_147_483_647);
+    expect(document.querySelector('.glass-toast')).toBeNull();
+  });
+
+  it('操作等待期間暫停有限倒數，失敗後再恢復', async () => {
+    vi.useFakeTimers();
+    const { error } = await loadToast();
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let rejectAction;
+    const onClick = vi.fn(() => new Promise((_, reject) => { rejectAction = reject; }));
+    error('Retry with a timer', { duration: 1000, action: { label: 'Retry', onClick } });
+    vi.advanceTimersByTime(200);
+    const action = document.querySelector('.glass-toast__action');
+    action.click();
+    action.click();
+    vi.advanceTimersByTime(1500);
+    expect(action.isConnected).toBe(true);
+    expect(onClick).toHaveBeenCalledTimes(1);
+    const failure = new Error('Retry failed');
+    rejectAction(failure);
+    await Promise.resolve();
+    expect(log).toHaveBeenCalledWith('glass-toast: action failed', failure);
+    expect(action.hasAttribute('aria-disabled')).toBe(false);
+    vi.advanceTimersByTime(799);
+    expect(action.closest('.glass-toast').dataset.dismissing).toBeUndefined();
+    vi.advanceTimersByTime(300);
+    expect(action.isConnected).toBe(false);
+  });
+
+  it('同步操作拋錯後仍可重新操作', async () => {
+    const { error, dismissAll } = await loadToast();
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const failure = new Error('Retry failed');
+    const onClick = vi.fn().mockImplementationOnce(() => { throw failure; });
+    error('Retry', { action: { label: 'Retry', onClick } });
+    const action = document.querySelector('.glass-toast__action');
+    action.click();
+    expect(log).toHaveBeenCalledWith('glass-toast: action failed', failure);
+    expect(action.hasAttribute('aria-disabled')).toBe(false);
+    action.click();
+    expect(onClick).toHaveBeenCalledTimes(2);
+    expect(action.closest('.glass-toast').dataset.dismissing).toBe('true');
+    dismissAll();
+  });
+
   it('建立可操作的 toast 並顯示訊息', async () => {
     const { show } = await loadToast();
     show('測試訊息', { type: 'info' });

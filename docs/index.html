@@ -245,6 +245,9 @@ show('自訂', { type: 'warning', duration: 8000 });</code></pre>
 
             <h4><code>&lt;script&gt;</code> 引入（UMD，全域 <code>GlassToast</code>）</h4>
             <pre class="code" data-lang="html"><code>&lt;script src="https://unpkg.com/%PKG_SPEC%"&gt;&lt;/script&gt;
+&lt;!-- 也可以改用 jsDelivr
+&lt;script src="https://cdn.jsdelivr.net/npm/%PKG_SPEC%"&gt;&lt;/script&gt;
+--&gt;
 &lt;script&gt;
   GlassToast.register(); // 掛 window.toast + 注入樣式
   toast.info('哈囉');
@@ -294,6 +297,12 @@ show('自訂', { type: 'warning', duration: 8000 });</code></pre>
                     <td>—</td>
                     <td>內嵌操作按鈕，見 <a href="#action">action 按鈕</a></td>
                   </tr>
+                  <tr data-doc="option:dialog">
+                    <td><code>dialog</code></td>
+                    <td><code>HTMLDialogElement</code></td>
+                    <td>—</td>
+                    <td>在已開啟的<a href="#native-dialog">原生對話框</a>內顯示與宣告通知。</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -336,8 +345,8 @@ info('有新版本可用');</code></pre>
 
           <section class="doc" id="action" data-toc="action 按鈕">
             <h3><code>action</code> 按鈕</h3>
-            <p>傳入 <code>action: { label, onClick }</code> 會在訊息與關閉鈕之間放一顆按鈕；點擊後先執行 <code>onClick</code>，再關閉這則通知。<code>label</code> 同樣以 <code>textContent</code> 寫入。</p>
-            <p>沒有明確給 <code>duration</code> 時，帶 action 的通知<strong>預設不自動消失</strong>：需要使用者做決定的訊息，不該在對方讀完之前就不見。仍想自動消失，就明確指定 <code>duration</code>。</p>
+            <p>傳入 <code>action: { label, onClick }</code> 會在通知中加入一顆按鈕。一次只執行一個操作，成功後才關閉通知。若 <code>onClick</code> 回傳 Promise，等待期間會暫停倒數。回呼拋錯或 Promise 被拒絕時，套件會把錯誤記到 console 並允許重試。</p>
+            <p>帶 action 且未指定有限的 <code>duration</code> 時，通知會持續顯示。應用程式可自行向使用者顯示失敗原因。<code>label</code> 一律當成純文字處理。</p>
             <pre class="code" data-lang="js"><code>import { error } from '%PKG_NAME%';
 
 error('上傳失敗，是否重試？', {
@@ -450,6 +459,7 @@ toast.info('哈囉');</code></pre>
           <section class="doc" id="timing">
             <h3>停留時間</h3>
             <p>error 預設停留 10 秒（錯誤訊息通常較長，也需要時間判斷怎麼處理），其他變體 5.5 秒。底部的倒數條會隨時間縮短，指示剩餘時間。</p>
+            <p><code>NaN</code> 和無限值視為未指定。有限值 ≤ 0 代表持續顯示，正值最多 2,147,483,647 毫秒。短螢幕可捲動堆疊查看較早的通知，使用 Tab 聚焦按鈕時會捲入可見範圍。</p>
             <div class="table">
               <table>
                 <thead><tr><th>呼叫</th><th>結果</th></tr></thead>
@@ -672,7 +682,17 @@ success('儲存成功');</code></pre>
 
           <section class="doc" id="ssr">
             <h3>SSR</h3>
-            <p>所有入口在沒有 <code>document</code> 的環境 import 都是安全的：<code>/auto</code>、<code>register()</code>、<code>ensureStyles()</code> 不會做任何事。<code>show()</code> 需要 DOM，請只在 client 端呼叫，例如事件處理器、<code>useEffect</code> 或 <code>onMounted</code> 裡。</p>
+            <p>沒有 DOM 時可以匯入所有入口，<code>show()</code> 會回傳空的關閉函式。要實際顯示通知，請在瀏覽器呼叫，例如事件處理器、<code>useEffect</code> 或 <code>onMounted</code> 裡。</p>
+          </section>
+
+          <section class="doc" id="native-dialog" data-toc="原生對話框">
+            <h3>原生對話框</h3>
+            <p>用 <code>showModal()</code> 開啟原生對話框後，將對話框傳給 <code>dialog</code> 選項。通知和朗讀區域會留在對話框內，按鈕可照常操作。關閉對話框會清除其中的通知。表單欄位的驗證錯誤仍應顯示在欄位旁。</p>
+            <pre class="code" data-lang="js"><code>import { error } from '%PKG_NAME%';
+
+const dialog = document.querySelector('#upload-dialog');
+dialog.showModal();
+error('上傳失敗，請檢查連線', { dialog, persistent: true });</code></pre>
           </section>
         </section>
       </main>

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.2 (2026-11-15)
+
+### Added
+
+- Pass an open native `dialog` to show and announce a toast inside it. Closing the dialog clears its toasts.
+
+### Fixed
+
+- Retry actions run once at a time. Async actions keep the toast open while pending and allow a retry after failure.
+- Toast stacks scroll on short screens so older actions and close buttons remain reachable.
+- Non-finite durations use the default, and large durations are capped at the browser timer limit.
+- Calling `show()` without a DOM returns a no-op dismiss function.
+- The default jsDelivr link serves a browser JavaScript file while CommonJS keeps its existing entry.
+
+### Changed
+
+- Pages deploys after a clean install from npm and verifies the live docs, CDN examples, and demo after deployment.
+
 ## 0.1.1 (2026-11-14)
 
 ### Added

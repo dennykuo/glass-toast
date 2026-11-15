@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -22,6 +23,19 @@ try {
   ]);
   writeFileSync(join(fixture, 'package.json'), '{"private":true}\n');
   npm(['install', archive, '--ignore-scripts', '--offline', '--no-audit', '--no-fund', '--no-package-lock'], fixture);
+  const installed = join(fixture, 'node_modules', pkg.name);
+  for (const cdn of ['unpkg', 'jsdelivr']) {
+    assert.match(pkg[cdn], /\.js$/, `${cdn} must serve a browser script with a .js extension`);
+    assert.deepEqual(readFileSync(join(installed, pkg[cdn])), readFileSync(join(installed, pkg.main)));
+  }
+  execFileSync(process.execPath, ['--input-type=module', '--eval', `
+    import assert from 'node:assert/strict';
+    import { createRequire } from 'node:module';
+    const require = createRequire(import.meta.url);
+    for (const api of [await import('${pkg.name}'), require('${pkg.name}'), await import('${pkg.name}/auto')]) {
+      assert.doesNotThrow(() => api.show('Server message')());
+    }
+  `], { cwd: fixture, stdio: 'inherit' });
 
   const examples = ['README.md', 'README.zh-TW.md'].map((name) => {
     const markdown = readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
@@ -37,6 +51,8 @@ try {
     `import auto = require('${pkg.name}/auto');`,
     "const dismiss: () => void = toast.show('Saved', { type: 'success' });",
     "auto.register({ closeLabel: 'Dismiss notification' });",
+    "toast.error('Retry', { dialog: document.createElement('dialog'),",
+    "  action: { label: 'Retry', onClick: async () => 'done' } });",
     'dismiss();',
     '// @ts-expect-error Unknown positions must be rejected.',
     "toast.show('Invalid', { position: 'middle' });",

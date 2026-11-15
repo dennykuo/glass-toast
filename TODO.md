@@ -1,6 +1,6 @@
 # glass-toast 後續工作清單
 
-更新日期：2026-11-14（Asia/Taipei）。`0.1.1` 已在 npm 發布，正式文件站與互動 Demo 已更新。
+更新日期：2026-11-15（Asia/Taipei）。`0.1.2` 的變更與驗收項目列於下方。
 
 本清單接續 Polyscope 副本的 `.context/next-steps.md`，供原專案後續開發使用。
 歷史紀錄仍保留在原副本；以下狀態以本次核對為準。
@@ -9,10 +9,21 @@
 
 - 本輪變更接續 `develop` 上從 Polyscope 恢復的 8 個提交。
 - 每筆推送的驗證結果見 [develop 的 GitHub Actions](https://github.com/dennykuo/glass-toast/actions?query=branch%3Adevelop)。
-- [npm `0.1.1`](https://www.npmjs.com/package/@dennykuo/glass-toast/v/0.1.1) 是目前的 `latest`。
-- `0.1.1` 的發布提交 `326f319` 已推送至遠端 `develop` 和 `main`。
-- 正式文件站部署自 `326f319`；[main 手動 CI](https://github.com/dennykuo/glass-toast/actions/runs/43611100071) 的檢查與部署皆成功。
+- 目前的版本與發布說明見 [npm](https://www.npmjs.com/package/@dennykuo/glass-toast) 及 [GitHub Releases](https://github.com/dennykuo/glass-toast/releases)。
+- `0.1.1` 的發布提交 `326f319` 已推送至遠端 `develop` 和 `main`。[當時的 main 手動 CI](https://github.com/dennykuo/glass-toast/actions/runs/43611100071) 完成該版的 Pages 部署。
 - [GitHub Pages 文件站](https://dennykuo.github.io/glass-toast/) 已上線，發布來源為 GitHub Actions。
+
+## 0.1.2 改善項目
+
+- [x] 防止重試重複觸發。等待非同步操作完成，失敗時保留通知及重試按鈕。
+- [x] 限制通知堆疊高度，短螢幕仍可透過捲動或鍵盤操作較早的通知。
+- [x] 支援原生 modal 的 `dialog` 選項。通知、按鈕和朗讀區域會掛在指定對話框內。
+- [x] 處理異常計時、SSR 無 DOM 及 jsDelivr 預設腳本入口。兩份 README 與文件站均已更新。
+- [x] Pages 部署前安裝公開 npm 的指定版本，部署後驗證線上文件、CDN 腳本與 Demo。CI 也會核對兩份 README 的使用範例與套件版號。
+- [ ] 在實機驗證 iPhone VoiceOver 與 Android TalkBack。分別操作一般通知、錯誤通知、重試與關閉，再確認模態內的通知會朗讀。
+- [ ] 發布 `0.1.2` 後，在正式環境確認 npm 安裝、兩個 CDN 與 Pages 的檢查結果。
+
+本機通過 99 項單元測試、90 項跨瀏覽器測試、封裝與型別檢查。在 Node 22.13.0 的乾淨環境也通過安裝、單元測試、建置和封裝檢查。Pages 檢查使用本機文件站和建置後的 CDN 腳本演練。
 
 ## 本輪五項已完成
 

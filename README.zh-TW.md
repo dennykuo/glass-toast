@@ -19,7 +19,7 @@
 ## 安裝
 
 ```bash
-npm install @dennykuo/glass-toast@0.1.1
+npm install @dennykuo/glass-toast@0.1.2
 ```
 
 ## 快速開始
@@ -58,7 +58,10 @@ success('儲存成功');
 ### 3. `<script>` 直接引入（UMD，全域 `GlassToast`）
 
 ```html
-<script src="https://unpkg.com/@dennykuo/glass-toast@0.1.1"></script>
+<script src="https://unpkg.com/@dennykuo/glass-toast@0.1.2"></script>
+<!-- 也可以改用 jsDelivr
+<script src="https://cdn.jsdelivr.net/npm/@dennykuo/glass-toast@0.1.2"></script>
+-->
 <script>
   GlassToast.register(); // 掛 window.toast + 注入樣式
   toast.info('哈囉');
@@ -76,8 +79,9 @@ success('儲存成功');
 | `type` | `'success' \| 'error' \| 'warning' \| 'info'` | `'info'` | 變體 |
 | `position` | `'top-right' \| 'bottom-right' \| 'bottom-center'` | `'top-right'` | 顯示位置 |
 | `persistent` | `boolean` | `false` | `true` 時不自動消失、無進度條 |
-| `duration` | `number` | `error` 為 `10000`、其餘 `5500` | 自動消失毫秒數；`≤ 0` 視為 `persistent` |
-| `action` | `{ label, onClick }` | — | 內嵌操作按鈕；點擊執行 `onClick` 後自動關閉。未顯式給 `duration` 時預設 `persistent`（需使用者操作） |
+| `duration` | `number` | `error` 為 `10000`、其餘 `5500` | 非有限值使用預設。有指定有限值時，≤ 0 視為 `persistent`，正值上限為 2,147,483,647 毫秒。 |
+| `action` | `{ label, onClick }` | — | 一次執行一個操作，成功後關閉。未指定有限的 `duration` 時，通知會持續顯示。 |
+| `dialog` | `HTMLDialogElement` | — | 在已開啟的原生對話框內顯示與宣告通知。關閉對話框會清除其中的通知。 |
 
 訊息走 `textContent`，不解析 HTML，塞什麼字串都安全（`action.label` 亦然）。
 
@@ -88,6 +92,10 @@ error('上傳失敗，是否重試？', {
   action: { label: '重試', onClick: () => retryUpload() },
 });
 ```
+
+`onClick` 回傳 Promise 時，通知會暫停倒數，等操作成功才關閉。回呼拋錯或 Promise 被拒絕時，套件會把錯誤記到 console 並允許重試。應用程式可自行向使用者顯示失敗原因。
+
+短螢幕上可捲動堆疊查看較早的通知。使用 Tab 聚焦按鈕時，瀏覽器會將它捲入可見範圍。
 
 ### `dismissAll(options?)`
 
@@ -156,7 +164,17 @@ dark 覆寫全部走 `:where()` 壓成與 base 相同的 specificity，你的覆
 
 - 嚴格 CSP（禁 inline `<style>`）：改顯式 `import '@dennykuo/glass-toast/style.css'` + `register({ injectStyles: false })`
 - 已自行載入 style.css 且想避免重複注入：在你的 `<link>` / `<style>` 加 `data-glass-toast` 屬性即可被偵測跳過
-- SSR：所有入口在無 `document` 環境安全 no-op，`show()` 請在 client 端呼叫
+- SSR：沒有 DOM 時，`show()` 回傳空的關閉函式。要顯示通知請在瀏覽器呼叫。
+
+使用原生 modal 時，可傳入已開啟的 `dialog`，讓通知和按鈕留在對話框內。傳入尚未開啟或已從頁面移除的對話框時，不會顯示通知。
+
+```js
+import { error } from '@dennykuo/glass-toast';
+
+const dialog = document.querySelector('#upload-dialog');
+dialog.showModal();
+error('上傳失敗', { dialog, persistent: true });
+```
 
 ## 開發
 
@@ -192,7 +210,7 @@ docs/
 
 頁面一律平放在 `docs/` 根目錄，partial 裡的站內連結都寫 `./`；套件名稱與版本以 `%PKG_NAME%` 等從 `package.json` 帶入。
 
-CI 檢查 `main`、`develop` 的推送和 PR。`main` 每次只跑一輪驗證，該版本已在 npm 發布時會部署同次驗證的文件站。若因版本未發布而略過部署，發布後可在 `main` 手動執行 **CI**。文件站的 npm 和 CDN 範例使用同一個套件版本。
+CI 檢查 `main`、`develop` 的推送和 PR。`main` 會先在乾淨專案從公開 npm 安裝指定版本，再部署文件站。若因版本未發布而略過部署，發布後可在 `main` 手動執行 **CI**。部署完成後，CI 會打開正式站驗證版號、CDN 腳本和 Demo 的重試操作，並在檢查階段核對兩份 README 的版號。
 
 開發依賴暫以 `minimatch` override 選用 v11，處理 ESLint 仍要求 v10 時的
 [GHSA-g3hv-75wg-m249](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249)。

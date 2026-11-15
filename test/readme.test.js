@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { read, publicExports, showOptions, registerOptions } from './helpers/api-surface.js';
 
+const { name: packageName, version } = JSON.parse(read('package.json'));
 const READMES = {
   'README.md': 'README.zh-TW.md',
   'README.zh-TW.md': 'README.md',
@@ -24,6 +25,13 @@ describe.each(Object.entries(READMES))('%s', (file, counterpart) => {
 
   it(`連到另一個語言版本（${counterpart}）`, () => {
     expect(text).toContain(`](${counterpart})`);
+  });
+
+  it('安裝與 CDN 範例使用 package.json 的版本', () => {
+    const spec = `${packageName}@${version}`;
+    expect(text).toContain(`npm install ${spec}\n`);
+    expect([...text.matchAll(/<script src="(https:\/\/(?:unpkg\.com\/|cdn\.jsdelivr\.net\/npm\/)[^"]+)">/g)]
+      .map(([, url]) => new URL(url).pathname)).toEqual([`/${spec}`, `/npm/${spec}`]);
   });
 
   it('涵蓋每個公開 export', async () => {

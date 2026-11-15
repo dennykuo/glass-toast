@@ -19,7 +19,7 @@ Glassmorphism toast notifications — vanilla JS, zero runtime dependencies, no 
 ## Install
 
 ```bash
-npm install @dennykuo/glass-toast@0.1.1
+npm install @dennykuo/glass-toast@0.1.2
 ```
 
 ## Quick start
@@ -58,7 +58,10 @@ success('Saved');
 ### 3. `<script>` tag (UMD, global `GlassToast`)
 
 ```html
-<script src="https://unpkg.com/@dennykuo/glass-toast@0.1.1"></script>
+<script src="https://unpkg.com/@dennykuo/glass-toast@0.1.2"></script>
+<!-- Or use jsDelivr
+<script src="https://cdn.jsdelivr.net/npm/@dennykuo/glass-toast@0.1.2"></script>
+-->
 <script>
   GlassToast.register(); // sets window.toast and injects styles
   toast.info('Hello');
@@ -76,8 +79,9 @@ Returns a function that closes the toast. The shortcuts `success` / `error` / `w
 | `type` | `'success' \| 'error' \| 'warning' \| 'info'` | `'info'` | Variant |
 | `position` | `'top-right' \| 'bottom-right' \| 'bottom-center'` | `'top-right'` | Where the toast appears |
 | `persistent` | `boolean` | `false` | When `true`, the toast never auto-dismisses and shows no progress bar |
-| `duration` | `number` | `10000` for `error`, `5500` otherwise | Milliseconds before auto-dismiss; `≤ 0` is treated as `persistent` |
-| `action` | `{ label, onClick }` | — | Inline action button; runs `onClick`, then closes the toast. Without an explicit `duration`, toasts with an action are `persistent` (they need a user decision) |
+| `duration` | `number` | `10000` for `error`, `5500` otherwise | Non-finite values use the default. Finite values ≤ 0 mean `persistent`. Positive values are capped at 2,147,483,647 ms. |
+| `action` | `{ label, onClick }` | — | Runs once at a time and closes the toast on success. Without an explicit finite `duration`, action toasts are persistent. |
+| `dialog` | `HTMLDialogElement` | — | Shows and announces the toast inside an open native dialog. Closing the dialog clears its toasts. |
 
 Messages are written with `textContent` and never parsed as HTML, so any string is safe (`action.label` too).
 
@@ -88,6 +92,10 @@ error('Upload failed. Retry?', {
   action: { label: 'Retry', onClick: () => retryUpload() },
 });
 ```
+
+Return the Promise from `onClick` to pause the countdown until the request settles. If the callback throws or rejects, the library logs the error and lets the user retry. Handle any user-facing error details in your application.
+
+On short screens, scroll the stack to reach older toasts. Tabbing to a button brings it into view.
 
 ### `dismissAll(options?)`
 
@@ -156,7 +164,17 @@ Use `persistent: true` for important messages or actions available only in the t
 
 - Strict CSP (no inline `<style>`): import `'@dennykuo/glass-toast/style.css'` explicitly and call `register({ injectStyles: false })`
 - Already loading the stylesheet yourself and want to avoid a duplicate: add a `data-glass-toast` attribute to your `<link>` / `<style>` and auto-injection will detect it and skip
-- SSR: every entry point is a safe no-op without `document`; call `show()` on the client only
+- SSR: `show()` returns a no-op dismiss function when no DOM is available. Call it on the client to display a toast.
+
+Pass the open `dialog` element to keep the toast and its controls inside a native modal. An unopened or detached dialog produces no toast.
+
+```js
+import { error } from '@dennykuo/glass-toast';
+
+const dialog = document.querySelector('#upload-dialog');
+dialog.showModal();
+error('Upload failed', { dialog, persistent: true });
+```
 
 ## Development
 
@@ -192,7 +210,7 @@ docs/
 
 Pages sit flat in the `docs/` root, so links inside partials always use `./`. The package name and version come from `package.json` via `%PKG_NAME%` and friends.
 
-CI checks pushes to `main` and `develop`, plus pull requests. A `main` run checks the package once and deploys its docs artifact when that version exists on npm. If the run skips deployment, run **CI** on `main` after publishing. The docs use the package version for both npm and CDN examples.
+CI checks pushes to `main` and `develop`, plus pull requests. On `main`, CI installs the exact public npm version into a fresh project before deploying the docs. If deployment is skipped because the version is unpublished, run **CI** on `main` after publishing. After deployment, CI opens the live docs and verifies the version, CDN scripts, and the demo retry action. CI also checks the version in both READMEs.
 
 The development-only `minimatch` override selects v11 while ESLint still requests v10,
 to address [GHSA-g3hv-75wg-m249](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249).

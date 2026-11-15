@@ -129,3 +129,140 @@ test('320px 下長操作文字、訊息與關閉鈕都放得下', async ({ page 
   await close.click();
   await expect(toast).toHaveCount(0);
 });
+
+test('快速雙擊重試只執行一次', async ({ page }) => {
+  await load(page, 'light');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.evaluate(() => {
+    window.GlassToast.error('Upload failed', {
+      action: {
+        label: 'Retry',
+        onClick() { document.querySelector('#other').textContent += '!'; },
+      },
+    });
+  });
+  await page.getByRole('button', { name: 'Retry' }).dblclick();
+  await expect(page.getByRole('button', { name: 'Retry' })).toHaveCount(0);
+  await expect(page.locator('#other')).toHaveText('Another action!');
+});
+
+test('非同步重試等待結果，失敗可再試且不產生未處理的例外', async ({ page }) => {
+  await load(page, 'light');
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.evaluate(() => {
+    window.GlassToast.error('Upload failed', {
+      action: {
+        label: 'Retry',
+        onClick() {
+          document.querySelector('#other').textContent += '!';
+          return new Promise((resolve, reject) => {
+            window.finishRetry = (ok) => ok ? resolve() : reject(new Error('Upload failed'));
+          });
+        },
+      },
+    });
+  });
+  const action = page.getByRole('button', { name: 'Retry' });
+  await action.focus();
+  await action.press('Enter');
+  await expect(action).toBeDisabled();
+  await expect(action).toBeFocused();
+  await action.press('Enter');
+  await expect(page.locator('#other')).toHaveText('Another action!');
+  await page.evaluate(() => window.finishRetry(false));
+  await expect(action).toBeEnabled();
+  await expect(action).toBeFocused();
+  await action.press('Enter');
+  await page.evaluate(() => window.finishRetry(true));
+  await expect(action).toHaveCount(0);
+  await expect(page.locator('#other')).toHaveText('Another action!!');
+  expect(errors).toEqual([]);
+});
+
+test('短螢幕的置底堆疊讓最新通知可操作，較早通知仍能捲動及用鍵盤關閉', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await load(page, 'light');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.evaluate(() => {
+    const message = '需重新確認付款資料與收件地址，確認完成後才能重新送出訂單。'.repeat(6);
+    const action = { label: '重新檢查付款資料與聯絡資訊之後，再送出這筆訂單', onClick() {} };
+    for (let i = 1; i <= 4; i++) {
+      window.GlassToast.error(`通知 ${i}：${message}`, { position: 'bottom-center', action });
+    }
+  });
+  const close = (number) => page.locator('.glass-toast').filter({ hasText: `通知 ${number}：` })
+    .getByRole('button', { name: 'Close', exact: true });
+  const stack = page.locator('[data-toast-container="bottom-center"]');
+  await expect(stack).toBeInViewport({ ratio: 1 });
+  await expect(close(4)).toBeInViewport({ ratio: 1 });
+  await close(4).hover();
+  await page.mouse.wheel(0, -1000);
+  await expect(close(1)).toBeInViewport({ ratio: 1 });
+  await close(1).focus();
+  await page.keyboard.press('Escape');
+  await expect(close(1)).toHaveCount(0);
+  await expect(close(4)).toHaveCount(1);
+});
+
+test('文字放大時，鍵盤能將短螢幕堆疊中較早的通知捲入畫面', async ({ page, browserName }) => {
+  await page.setViewportSize({ width: 390, height: 448 });
+  await load(page, 'light');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.addStyleTag({ content: 'html { font-size: 200%; }' });
+  await page.evaluate(() => {
+    for (let i = 1; i <= 4; i++) {
+      window.GlassToast.info(`Notification ${i}`, { persistent: true });
+    }
+  });
+  const firstClose = page.locator('.glass-toast').filter({ hasText: 'Notification 1' })
+    .getByRole('button', { name: 'Close', exact: true });
+  const previous = page.locator('#other');
+  await previous.focus();
+  await page.keyboard.press('Tab');
+  // macOS WebKit 預設以 Option+Tab 走訪按鈕。
+  if (browserName === 'webkit' && !await firstClose.evaluate((el) => document.activeElement === el)) {
+    await previous.focus();
+    await page.keyboard.press('Alt+Tab');
+  }
+  await expect(firstClose).toBeFocused();
+  await expect(firstClose).toBeInViewport({ ratio: 1 });
+  await page.keyboard.press('Escape');
+  await expect(firstClose).toHaveCount(0);
+});
+
+test('原生 modal 內的通知可宣告與操作，關閉 modal 不會留下舊通知', async ({ page }) => {
+  await load(page, 'light');
+  await page.evaluate(() => {
+    const dialog = document.createElement('dialog');
+    dialog.setAttribute('aria-label', 'Upload');
+    const submit = document.createElement('button');
+    submit.textContent = 'Submit';
+    dialog.append(submit);
+    document.body.append(dialog);
+    window.GlassToast.info('Outside notification', { persistent: true });
+    dialog.showModal();
+    submit.focus();
+    window.GlassToast.error('Upload failed', {
+      dialog,
+      action: { label: 'Retry', onClick() { submit.textContent = 'Retried'; } },
+    });
+  });
+  const dialog = page.getByRole('dialog', { name: 'Upload' });
+  await expect(dialog.getByRole('alert')).toHaveText('Upload failed');
+  const retry = dialog.getByRole('button', { name: 'Retry' });
+  await retry.focus();
+  await expect(retry).toBeFocused();
+  await retry.click({ trial: true });
+  await retry.press('Enter');
+  await expect(dialog.getByRole('button', { name: 'Retried' })).toBeFocused();
+  await page.evaluate(() => {
+    const dialog = document.querySelector('dialog');
+    window.GlassToast.error('Unsaved', { dialog, persistent: true });
+    dialog.close();
+  });
+  await expect(page.locator('dialog .glass-toast')).toHaveCount(0);
+  await expect(page.locator('body > [data-toast-container] .glass-toast')).toHaveText('Outside notification');
+  await page.locator('dialog').evaluate((el) => el.showModal());
+  await expect(dialog.getByText('Unsaved')).toHaveCount(0);
+});

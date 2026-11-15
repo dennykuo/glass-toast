@@ -11,15 +11,16 @@ import cssText from './styles.css?inline';
  *
  * @typedef {Object} ToastAction
  * @property {string} label 按鈕文字
- * @property {() => void} onClick 點擊後執行（執行完自動 dismiss）
+ * @property {() => unknown} onClick 成功後關閉；可回傳 Promise，失敗時保留通知及重試按鈕
  *
  * @typedef {Object} ToastOptions
  * @property {ToastType} [type='info'] 變體
  * @property {ToastPosition} [position='top-right'] 顯示位置
  * @property {boolean} [persistent=false] true 時不自動消失、無進度條
  * @property {number} [duration] 自動消失毫秒數（未指定時 error 為 10000、其餘 5500）；
- *   ≤ 0 視為 persistent
+ *   非有限值視為未指定；有限值 ≤ 0 視為 persistent，正值上限為 2147483647
  * @property {ToastAction} [action] 內嵌操作按鈕（如「重試」）；未顯式給 duration 時預設 persistent
+ * @property {HTMLDialogElement} [dialog] 掛載至已開啟的原生對話框，關閉時清除該對話框的通知
  *
  * @typedef {Object} ToastApi
  * @property {typeof show} show
@@ -38,6 +39,7 @@ const GLOW_DURATION_MS = 1400;   // 進場 glow ring 脈衝時長
 // 每變體預設自動消失毫秒；error 停留更久供閱讀，其餘走 fallback
 const DEFAULT_DURATION_MS = { error: 10000 };
 const FALLBACK_DURATION_MS = 5500;
+const MAX_DURATION_MS = 2_147_483_647; // 瀏覽器 setTimeout 的最大 delay
 
 // 同一位置同時可見的 toast 上限；超過則先關掉最舊的，避免無限堆疊溢出視窗
 const MAX_VISIBLE_PER_POSITION = 4;
@@ -95,12 +97,26 @@ const prefersReducedMotion = () =>
 
 // --- 惰性容器快取 ---
 
-const containerMap = new Map();
+const scopes = new Map();
 const toastState = new WeakMap();
 
-let announcers;
+function getScope(root) {
+  for (const [previousRoot, scope] of scopes) {
+    if (!previousRoot.isConnected) removeScope(scope);
+  }
+  let scope = scopes.get(root);
+  if (!scope) {
+    scope = { root, containers: new Map(), announcers: undefined };
+    if (root.localName === 'dialog') {
+      scope.onClose = () => { if (!root.open) removeScope(scope); };
+      root.addEventListener('close', scope.onClose);
+    }
+    scopes.set(root, scope);
+  }
+  return scope;
+}
 
-function clearAnnouncements() {
+function clearAnnouncements(announcers) {
   for (const region of Object.values(announcers ?? {})) {
     cancelAnimationFrame(region.frame);
     region.frame = undefined;
@@ -109,24 +125,24 @@ function clearAnnouncements() {
   }
 }
 
-function ensureAnnouncers() {
-  if (typeof document === 'undefined' || !document.body) return;
+function ensureAnnouncers(scope) {
+  const { announcers, root } = scope;
   if (announcers?.status.el.isConnected && announcers.alert.el.isConnected) return;
-  clearAnnouncements();
+  clearAnnouncements(announcers);
   for (const region of Object.values(announcers ?? {})) region.el.remove();
-  announcers = Object.fromEntries(['status', 'alert'].map((role) => {
+  scope.announcers = Object.fromEntries(['status', 'alert'].map((role) => {
     const el = document.createElement('div');
     el.className = 'glass-toast-announcer';
     el.setAttribute('role', role);
     el.setAttribute('aria-atomic', 'true');
-    document.body.appendChild(el);
+    root.appendChild(el);
     return [role, { el, pending: [], frame: undefined }];
   }));
 }
 
-function announce(toast, type, message) {
-  ensureAnnouncers();
-  const region = announcers[type === 'error' ? 'alert' : 'status'];
+function announce(scope, toast, type, message) {
+  ensureAnnouncers(scope);
+  const region = scope.announcers[type === 'error' ? 'alert' : 'status'];
   region.pending.push({ toast, message });
   if (region.frame !== undefined) return;
   // 先讓瀏覽器看到空區域，下一次繪製後才填文字。清空也讓相同訊息可再次宣告。
@@ -148,17 +164,19 @@ function announce(toast, type, message) {
 // SPA 不重載時用 resume() 解鎖
 let suppressed = false;
 
-function getContainer(position) {
+function getContainer({ root, containers }, position) {
   // SPA 換頁（如 Astro ViewTransitions）會替換 body 內容，cached container
   // 會被卸下；用 isConnected 判斷後重建
-  const cached = containerMap.get(position);
+  const cached = containers.get(position);
   if (cached && cached.isConnected) return cached;
 
   const el = document.createElement('div');
   el.className = `glass-toast-container ${POSITION_CLASS[position]}`;
   el.dataset.toastContainer = position;
-  document.body.appendChild(el);
-  containerMap.set(position, el);
+  // 可捲動的容器有些瀏覽器會自動加入 Tab 順序，焦點直接進入通知按鈕。
+  el.tabIndex = -1;
+  root.appendChild(el);
+  containers.set(position, el);
   return el;
 }
 
@@ -175,12 +193,12 @@ function enforceCap(container) {
 // --- 焦點交還 ---
 // toast 移除時若焦點還在其中（鍵盤使用者停在關閉/action 鈕），把焦點交還
 // 觸發者，否則交給任一仍存在的 toast 關閉鈕，避免焦點掉回 body 頂端
-function restoreFocus(invoker) {
+function restoreFocus(invoker, root) {
   if (invoker && invoker.isConnected && typeof invoker.focus === 'function') {
     invoker.focus();
     if (document.activeElement === invoker) return;
   }
-  const nextBtn = document.querySelector(
+  const nextBtn = root.querySelector(
     '[data-toast-container] > .glass-toast:not([data-dismissing]) .glass-toast__close',
   );
   if (nextBtn) nextBtn.focus();
@@ -276,12 +294,12 @@ function playGlowRing(el, type) {
 
 // --- Dismiss ---
 
-function removeAndCleanup(el, position) {
+function removeAndCleanup(el, containers, position) {
   const container = el.parentElement;
   el.remove();
   if (container && container.children.length === 0) {
     container.remove();
-    if (containerMap.get(position) === container) containerMap.delete(position);
+    if (containers.get(position) === container) containers.delete(position);
   }
 }
 
@@ -318,7 +336,9 @@ function animateExit(el) {
  * @returns {() => void} 手動 dismiss 函式
  */
 export function show(message, options = {}) {
-  if (suppressed) return () => {};
+  if (suppressed || typeof document === 'undefined' || !document.body) return () => {};
+  const { dialog } = options;
+  if (dialog && (!dialog.isConnected || !dialog.open)) return () => {};
 
   let {
     type = DEFAULT_TYPE,
@@ -331,9 +351,9 @@ export function show(message, options = {}) {
   if (!Object.hasOwn(POSITION_CLASS, position)) position = DEFAULT_POSITION;
 
   // duration 未指定 → 變體預設（error 停留更久）
-  const durationGiven = options.duration !== undefined;
-  let duration = durationGiven
-    ? options.duration
+  const durationGiven = Number.isFinite(options.duration);
+  const duration = durationGiven
+    ? Math.min(options.duration, MAX_DURATION_MS)
     : (DEFAULT_DURATION_MS[type] ?? FALLBACK_DURATION_MS);
 
   // 有 action 需使用者操作、或 duration ≤ 0（語意：不自動消失）→ 視為 persistent
@@ -341,15 +361,20 @@ export function show(message, options = {}) {
 
   if (autoInjectStyles) ensureStyles(); // SPA swap 可能拔掉注入的 <style>，每次 cheap re-check
 
-  const container = getContainer(position);
+  const scope = getScope(dialog ?? document.body);
+  const container = getContainer(scope, position);
   enforceCap(container); // 數量上限：加入前先關掉超量的最舊 toast
 
   const { el, btn, actionBtn } = createToastEl(message, { type, position, persistent, duration, action });
 
   // 記錄觸發者，dismiss 後把焦點交還（若焦點曾停在 toast 內）
-  const invoker = typeof document !== 'undefined' ? document.activeElement : null;
+  const invoker = document.activeElement;
 
+  // 已捲到末端且未在操作通知時，讓新通知留在可見範圍。
+  const followLatest = !container.contains(invoker)
+    && container.scrollHeight - container.clientHeight - container.scrollTop <= 1;
   container.appendChild(el);
+  if (followLatest) container.scrollTop = container.scrollHeight;
 
   const bar = el.querySelector('.glass-toast__bar');
   let timerId;
@@ -358,6 +383,9 @@ export function show(message, options = {}) {
   let progressFrameId;
   let glow;
   let removed = false;
+  let actionPending = false;
+  let pauseTimer;
+  let maybeResumeTimer;
   const stop = () => {
     clearTimeout(timerId);
     cancelAnimationFrame(frameId);
@@ -370,7 +398,7 @@ export function show(message, options = {}) {
     stop();
     clearTimeout(exitTimerId);
     toastState.delete(el);
-    removeAndCleanup(el, position);
+    removeAndCleanup(el, scope.containers, position);
   };
   const dismiss = () => {
     if (removed || el.dataset.dismissing) return;
@@ -382,11 +410,11 @@ export function show(message, options = {}) {
       // 使用者可能在 280ms 退場期間移走焦點。
       const hadFocus = el.contains(document.activeElement);
       remove();
-      if (hadFocus) restoreFocus(invoker);
+      if (hadFocus) restoreFocus(invoker, scope.root);
     }, TOAST_ANIM_MS);
   };
   toastState.set(el, { dismiss, remove, invoker });
-  announce(el, type, message);
+  announce(scope, el, type, message);
 
   // 觸發進場動畫（reduced motion 時僅淡入，不位移）
   // double RAF：第一幀讓 initial state（--enter / --faded）被瀏覽器 commit，
@@ -402,14 +430,6 @@ export function show(message, options = {}) {
 
   // 關閉按鈕
   btn.addEventListener('click', dismiss);
-
-  // action 按鈕：執行 onClick 後 dismiss
-  if (actionBtn) {
-    actionBtn.addEventListener('click', () => {
-      action.onClick?.();
-      dismiss();
-    });
-  }
 
   // Esc 關閉聚焦中的 toast（keydown 由焦點元素冒泡到 el；不劫持全域 Esc）
   el.addEventListener('keydown', (e) => {
@@ -436,7 +456,7 @@ export function show(message, options = {}) {
       progressFrameId = requestAnimationFrame(startProgress);
     });
 
-    const pause = () => {
+    pauseTimer = () => {
       if (paused || removed || el.dataset.dismissing) return;
       paused = true;
       clearTimeout(timerId);
@@ -457,20 +477,69 @@ export function show(message, options = {}) {
     };
 
     // 只有 hover 與焦點都離開才恢復倒數
-    const maybeResume = () => { if (!hovered && !focused) resumeTimer(); };
+    maybeResumeTimer = () => { if (!hovered && !focused && !actionPending) resumeTimer(); };
 
-    el.addEventListener('mouseenter', () => { hovered = true; pause(); });
-    el.addEventListener('mouseleave', () => { hovered = false; maybeResume(); });
-    el.addEventListener('focusin', () => { focused = true; pause(); });
+    el.addEventListener('mouseenter', () => { hovered = true; pauseTimer(); });
+    el.addEventListener('mouseleave', () => { hovered = false; maybeResumeTimer(); });
+    el.addEventListener('focusin', () => { focused = true; pauseTimer(); });
     el.addEventListener('focusout', (e) => {
       // 焦點仍在 toast 內部移動（關閉↔action）不算離開
       if (el.contains(e.relatedTarget)) return;
       focused = false;
-      maybeResume();
+      maybeResumeTimer();
+    });
+  }
+
+  if (actionBtn) {
+    const actionFailed = (error) => {
+      console.error('glass-toast: action failed', error);
+      actionPending = false;
+      if (removed || el.dataset.dismissing) return;
+      actionBtn.removeAttribute('aria-disabled');
+      maybeResumeTimer?.();
+    };
+    actionBtn.addEventListener('click', () => {
+      if (removed || el.dataset.dismissing || actionPending) return;
+      actionPending = true;
+      // aria-disabled 保留焦點；click 守門同時涵蓋鍵盤及滑鼠。
+      actionBtn.setAttribute('aria-disabled', 'true');
+      pauseTimer?.();
+      try {
+        const result = action.onClick?.();
+        if (typeof result?.then === 'function') {
+          Promise.resolve(result).then(dismiss, actionFailed);
+        } else {
+          dismiss();
+        }
+      } catch (error) {
+        actionFailed(error);
+      }
     });
   }
 
   return dismiss;
+}
+
+function clearScope({ announcers, containers }) {
+  clearAnnouncements(announcers);
+  let focusedState;
+  for (const container of containers.values()) {
+    for (const toast of [...container.children]) {
+      const state = toastState.get(toast);
+      if (toast.contains(document.activeElement)) focusedState = state;
+      state?.remove();
+    }
+    container.remove();
+  }
+  containers.clear();
+  return focusedState;
+}
+
+function removeScope(scope) {
+  clearScope(scope);
+  for (const region of Object.values(scope.announcers ?? {})) region.el.remove();
+  if (scope.onClose) scope.root.removeEventListener('close', scope.onClose);
+  scopes.delete(scope.root);
 }
 
 /**
@@ -481,18 +550,12 @@ export function show(message, options = {}) {
  */
 export function dismissAll({ suppress = false } = {}) {
   if (suppress) suppressed = true;
-  clearAnnouncements();
-  let focusedState;
-  for (const container of containerMap.values()) {
-    for (const toast of [...container.children]) {
-      const state = toastState.get(toast);
-      if (toast.contains(document.activeElement)) focusedState = state;
-      state?.remove();
-    }
-    container.remove();
+  let restore;
+  for (const scope of scopes.values()) {
+    const state = clearScope(scope);
+    if (state) restore = () => restoreFocus(state.invoker, scope.root);
   }
-  containerMap.clear();
-  if (focusedState) restoreFocus(focusedState.invoker);
+  restore?.();
 }
 
 /** 解除 dismissAll() 造成的 show() 靜音鎖 */
@@ -531,7 +594,7 @@ export function register({ global = true, injectStyles = true, target, closeLabe
   autoInjectStyles = injectStyles;
   closeLabel = typeof label === 'string' && label.trim() ? label : DEFAULT_CLOSE_LABEL;
   if (injectStyles) ensureStyles();
-  ensureAnnouncers();
+  if (typeof document !== 'undefined' && document.body) ensureAnnouncers(getScope(document.body));
   if (global) {
     const t = target ?? (typeof window !== 'undefined' ? window : undefined);
     if (t) t.toast = api;

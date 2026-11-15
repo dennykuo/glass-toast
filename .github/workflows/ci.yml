@@ -23,6 +23,8 @@ jobs:
     if: github.ref == 'refs/heads/main' && needs.check.outputs.pages-ready == 'true'
     needs: check
     runs-on: ubuntu-latest
+    outputs:
+      page-url: ${{ steps.deployment.outputs.page_url }}
     permissions:
       pages: write
       id-token: write
@@ -32,3 +34,20 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  smoke-pages:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Verify deployed docs, demo and CDN examples
+        env:
+          PAGES_URL: ${{ needs.deploy.outputs.page-url }}
+        run: node scripts/check-pages.mjs
