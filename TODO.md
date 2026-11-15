@@ -1,6 +1,6 @@
 # glass-toast 後續工作清單
 
-更新日期：2026-11-15（Asia/Taipei）。`0.1.2` 的變更與驗收項目列於下方。
+更新日期：2026-11-16（Asia/Taipei）。`0.1.2` 的變更與驗收項目列於下方。
 
 本清單接續 Polyscope 副本的 `.context/next-steps.md`，供原專案後續開發使用。
 歷史紀錄仍保留在原副本；以下狀態以本次核對為準。
@@ -20,6 +20,7 @@
 - [x] 支援原生 modal 的 `dialog` 選項。通知、按鈕和朗讀區域會掛在指定對話框內。
 - [x] 處理異常計時、SSR 無 DOM 及 jsDelivr 預設腳本入口。兩份 README 與文件站均已更新。
 - [x] Pages 部署前安裝公開 npm 的指定版本，部署後驗證線上文件、CDN 腳本與 Demo。CI 也會核對兩份 README 的使用範例與套件版號。
+- [x] CI、Pages 上傳和部署所用的 Actions 已更新到使用 Node.js 24 的版本。專案測試用的 Node 版本由 `.nvmrc` 管理。
 - [ ] 在實機驗證 iPhone VoiceOver 與 Android TalkBack。分別操作一般通知、錯誤通知、重試與關閉，再確認模態內的通知會朗讀。
 - [ ] 發布 `0.1.2` 後，在正式環境確認 npm 安裝、兩個 CDN 與 Pages 的檢查結果。
 
