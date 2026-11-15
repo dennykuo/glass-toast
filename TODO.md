@@ -22,7 +22,8 @@
 - [x] Pages 部署前安裝公開 npm 的指定版本，部署後驗證線上文件、CDN 腳本與 Demo。CI 也會核對兩份 README 的使用範例與套件版號。
 - [x] CI、Pages 上傳和部署所用的 Actions 已更新到使用 Node.js 24 的版本。專案測試用的 Node 版本由 `.nvmrc` 管理。
 - [ ] 在實機驗證 iPhone VoiceOver 與 Android TalkBack。分別操作一般通知、錯誤通知、重試與關閉，再確認模態內的通知會朗讀。
-- [ ] 發布 `0.1.2` 後，在正式環境確認 npm 安裝、兩個 CDN 與 Pages 的檢查結果。
+- [x] 2026-11-16 發布 [npm `0.1.2`](https://www.npmjs.com/package/@dennykuo/glass-toast/v/0.1.2)，確認乾淨安裝、ESM、CommonJS、CSS 與封裝雜湊。UNPKG 和 jsDelivr 的預設網址都能在瀏覽器載入並操作通知。
+  [main 手動 CI](https://github.com/dennykuo/glass-toast/actions/runs/43737863222) 通過檢查、部署與上線驗證。文件首頁和 Demo 都顯示 `v0.1.2`。
 
 本機通過 99 項單元測試、90 項跨瀏覽器測試、封裝與型別檢查。在 Node 22.13.0 的乾淨環境也通過安裝、單元測試、建置和封裝檢查。Pages 檢查使用本機文件站和建置後的 CDN 腳本演練。
 
@@ -58,16 +59,11 @@
   原本的 14 項（7 high、7 moderate）已清除；未使用 `npm audit fix --force`。
   新增的 Playwright 僅為開發依賴，套件執行期仍無第三方依賴。
 
-### Minimatch override 的原因與後續維護
+### ESLint 與 Minimatch
 
-ESLint 10 的依賴仍要求 Minimatch 10；
-[官方通報 GHSA-g3hv-75wg-m249](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249)
-列出的修補版為 11.0.1。因此暫以 `overrides.minimatch: ^11.0.1`，lockfile 鎖定 11.0.3。
-已核對 ESLint 使用的 `Minimatch.match` 介面，並確認更新前後選取相同 13 個 lint 檔案、
-忽略規則不變，且未定義變數仍會觸發 `no-undef`。README 已記錄這項相容性維護責任。
-
-- [ ] 後續更新 ESLint 時複查 override；上游直接採用修補版後移除。
-  若截至 2026-12-01 尚未更新 ESLint，也應複查一次。
+- [x] 2026-11-16 更新 ESLint 至 10.15.0。上游已直接依賴 `minimatch@^11.0.5`，lockfile 只解析出 11.0.8。
+  已移除先前為 [GHSA-g3hv-75wg-m249](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249) 設定的暫時 override，並同步更新兩份 README。
+  更新前後的 lint 都檢查相同 23 個檔案，`no-undef` 正常報錯。本機 99 項單元測試、90 項瀏覽器測試通過，`npm audit` 回報 0 項已知漏洞。
 
 ## 舊清單已完成
 

@@ -212,10 +212,8 @@ Pages sit flat in the `docs/` root, so links inside partials always use `./`. Th
 
 CI checks pushes to `main` and `develop`, plus pull requests. On `main`, CI installs the exact public npm version into a fresh project before deploying the docs. If deployment is skipped because the version is unpublished, run **CI** on `main` after publishing. After deployment, CI opens the live docs and verifies the version, CDN scripts, and the demo retry action. CI also checks the version in both READMEs.
 
-The development-only `minimatch` override selects v11 while ESLint still requests v10,
-to address [GHSA-g3hv-75wg-m249](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249).
-Its file selection, ignore patterns, and error reporting have been checked with this project.
-Revisit the override when updating ESLint; remove it once upstream dependencies include the fix.
+ESLint 10.15.0 requires a patched `minimatch` release directly. The lockfile resolves 11.0.8,
+so the temporary override for [GHSA-g3hv-75wg-m249](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249) has been removed.
 
 Documentation coverage is guarded by tests that scan the source for the public API, the `show()` / `register()` options, and every `--gt-*` variable:
 

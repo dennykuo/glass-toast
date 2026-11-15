@@ -212,10 +212,8 @@ docs/
 
 CI 檢查 `main`、`develop` 的推送和 PR。`main` 會先在乾淨專案從公開 npm 安裝指定版本，再部署文件站。若因版本未發布而略過部署，發布後可在 `main` 手動執行 **CI**。部署完成後，CI 會打開正式站驗證版號、CDN 腳本和 Demo 的重試操作，並在檢查階段核對兩份 README 的版號。
 
-開發依賴暫以 `minimatch` override 選用 v11，處理 ESLint 仍要求 v10 時的
-[GHSA-g3hv-75wg-m249](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249)。
-已核對本專案的檔案選取、忽略規則與錯誤偵測。後續更新 ESLint 時需重新檢查，
-待上游直接採用修補版後移除 override。
+ESLint 10.15.0 已直接採用修補後的 `minimatch`，lockfile 解析為 11.0.8。
+因此已移除先前為 [GHSA-g3hv-75wg-m249](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249) 設定的暫時 override。
 
 文件覆蓋率由測試守門，從原始碼掃出公開 API、`show()` / `register()` 選項與所有 `--gt-*` 變數：
 
