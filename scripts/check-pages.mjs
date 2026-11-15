@@ -39,7 +39,11 @@ export async function checkPages(context, url) {
     await page.locator('a[data-page="demo"]').click();
     await expect(page).toHaveURL(new URL('demo.html', home).href);
     await expect(page.locator('.brand__version')).toHaveText(`v${pkg.version}`);
+    const snippet = page.locator('#snippet');
+    // Demo 腳本綁定事件後才填入範例。
+    await expect(snippet).toContainText('const toast = register();', { timeout: 15_000 });
     await page.locator('#action').check();
+    await expect(snippet).toContainText("label: '重試'");
     await page.locator('#playground').getByRole('button', { name: 'error', exact: true }).click();
     await liveToast(page, '連線逾時').getByRole('button', { name: '重試', exact: true }).click();
     await expect(liveToast(page, '已重新送出')).toBeVisible();
