@@ -1,6 +1,6 @@
 {
   "name": "@dennykuo/glass-toast",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Zero-dependency glassmorphism toast notifications — vanilla JS, framework-free, Tailwind-free. 毛玻璃質感 toast 通知，零相依開箱即用。",
   "type": "module",
   "license": "MIT",

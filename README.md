@@ -19,7 +19,7 @@ Glassmorphism toast notifications — vanilla JS, zero runtime dependencies, no 
 ## Install
 
 ```bash
-npm install @dennykuo/glass-toast@0.1.2
+npm install @dennykuo/glass-toast@0.1.3
 ```
 
 ## Quick start
@@ -58,9 +58,9 @@ success('Saved');
 ### 3. `<script>` tag (UMD, global `GlassToast`)
 
 ```html
-<script src="https://unpkg.com/@dennykuo/glass-toast@0.1.2"></script>
+<script src="https://unpkg.com/@dennykuo/glass-toast@0.1.3"></script>
 <!-- Or use jsDelivr
-<script src="https://cdn.jsdelivr.net/npm/@dennykuo/glass-toast@0.1.2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@dennykuo/glass-toast@0.1.3"></script>
 -->
 <script>
   GlassToast.register(); // sets window.toast and injects styles

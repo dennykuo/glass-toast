@@ -313,12 +313,15 @@
     }
 
     .glass-toast:has(.glass-toast__action) {
-        grid-template-columns: auto minmax(0, 1fr) minmax(0, 35%) auto;
+        /* 短操作只佔文字需要的寬度，長標籤仍會換行。 */
+        grid-template-columns: auto minmax(0, 1fr) fit-content(35%) auto;
+        column-gap: 0.5rem;
     }
 
     .glass-toast:has(.glass-toast__action) .glass-toast__action {
         grid-column: 3;
         grid-row: 1;
+        justify-self: end;
     }
 }
 

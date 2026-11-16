@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3 (2026-11-16)
+
+### Fixed
+
+- Short action buttons sit next to the close button on desktop, leaving more room for the message.
+
 ## 0.1.2 (2026-11-15)
 
 ### Added

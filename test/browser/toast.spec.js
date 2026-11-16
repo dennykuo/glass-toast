@@ -106,6 +106,27 @@ for (const reducedMotion of ['no-preference', 'reduce']) {
   });
 }
 
+test('桌面的短操作靠近關閉鈕，讓 Demo 訊息排成一行', async ({ page }) => {
+  const message = '資料已成功儲存，變更即刻生效。';
+  await page.setViewportSize({ width: 1054, height: 1089 });
+  await load(page, 'light');
+  await page.evaluate((text) => {
+    window.GlassToast.success(text, { action: { label: '重試', onClick() {} } });
+  }, message);
+
+  const toast = page.locator('.glass-toast');
+  await expect(toast).toHaveCSS('opacity', '1');
+  const retry = await toast.getByRole('button', { name: '重試' }).boundingBox();
+  const close = await toast.getByRole('button', { name: 'Close', exact: true }).boundingBox();
+  expect(close.x - retry.x - retry.width).toBeGreaterThan(0);
+  expect(close.x - retry.x - retry.width).toBeLessThanOrEqual(16);
+
+  const lines = await toast.getByText(message, { exact: true }).evaluate((el) => {
+    return el.getBoundingClientRect().height / Number.parseFloat(getComputedStyle(el).lineHeight);
+  });
+  expect(lines).toBeCloseTo(1, 1);
+});
+
 test('320px 下長操作文字、訊息與關閉鈕都放得下', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await load(page, 'light');

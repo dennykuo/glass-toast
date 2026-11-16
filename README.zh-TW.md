@@ -19,7 +19,7 @@
 ## 安裝
 
 ```bash
-npm install @dennykuo/glass-toast@0.1.2
+npm install @dennykuo/glass-toast@0.1.3
 ```
 
 ## 快速開始
@@ -58,9 +58,9 @@ success('儲存成功');
 ### 3. `<script>` 直接引入（UMD，全域 `GlassToast`）
 
 ```html
-<script src="https://unpkg.com/@dennykuo/glass-toast@0.1.2"></script>
+<script src="https://unpkg.com/@dennykuo/glass-toast@0.1.3"></script>
 <!-- 也可以改用 jsDelivr
-<script src="https://cdn.jsdelivr.net/npm/@dennykuo/glass-toast@0.1.2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@dennykuo/glass-toast@0.1.3"></script>
 -->
 <script>
   GlassToast.register(); // 掛 window.toast + 注入樣式
